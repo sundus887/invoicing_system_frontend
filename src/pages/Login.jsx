@@ -54,12 +54,9 @@ const Login = () => {
         <div>
           {/* Logo positioned above app name */}
           <div className="flex flex-col items-center">
-            {/* CF Logo using styled text */}
+            {/* Logo Image */}
             <div className="mb-4">
-              <div className="text-6xl font-bold">
-                <span className="text-gray-800">C</span>
-                <span className="text-blue-600">F</span>
-              </div>
+              <img src="/logo.png" alt="Consultancy Forum Logo" className="w-20 h-20 object-contain" />
             </div>
             <h2 className="text-3xl font-extrabold text-gray-900">
               Consultancy Forum

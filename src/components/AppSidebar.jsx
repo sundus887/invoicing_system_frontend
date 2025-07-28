@@ -10,12 +10,9 @@ const AppSidebar = () => {
       <div className="p-6 border-b">
         {/* Logo positioned above app name */}
         <div className="flex flex-col items-center">
-          {/* CF Logo using styled text */}
+          {/* Logo Image */}
           <div className="mb-3">
-            <div className="text-4xl font-bold">
-              <span className="text-gray-800">C</span>
-              <span className="text-blue-600">F</span>
-            </div>
+            <img src="/logo.png" alt="Consultancy Forum Logo" className="w-14 h-14 object-contain" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800 text-center">Consultancy Forum</h1>
           <p className="text-sm text-gray-600 mt-1 text-center">Tax & Accounting Platform</p>
