@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Use environment variable with fallback
-const API_URL = process.env.REACT_APP_API_URL || 'https://consultancyforum.vercel.app/';
+const API_URL = process.env.REACT_APP_API_URL || 'https://consultancyforum.vercel.app';
 
 console.log('🚀 Using API URL:', API_URL);
 

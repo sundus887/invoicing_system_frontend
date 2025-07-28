@@ -11,8 +11,8 @@ const AppSidebar = () => {
         {/* Logo positioned above app name */}
         <div className="flex flex-col items-center">
           {/* Logo Image */}
-          <div className="mb-3">
-            <img src="/logo.png" alt="Consultancy Forum Logo" className="w-14 h-14 object-contain" />
+          <div className="mb-4">
+            <img src="/logo.jpg" alt="Consultancy Forum Logo" className="w-36 h-36 object-contain" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800 text-center">Consultancy Forum</h1>
           <p className="text-sm text-gray-600 mt-1 text-center">Tax & Accounting Platform</p>
