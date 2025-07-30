@@ -141,12 +141,15 @@ function InvoicesPage() {
         const BOM = '\uFEFF';
         const csvDataWithBOM = csvData.startsWith(BOM) ? csvData : BOM + csvData;
         
-        // Create and download the CSV file
-        const blob = new Blob([csvDataWithBOM], { type: 'text/csv;charset=utf-8;' });
+        // Create and download the CSV file with proper encoding
+        const blob = new Blob([csvDataWithBOM], { 
+          type: 'text/csv;charset=utf-8;' 
+        });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', `invoices-${new Date().toISOString().split('T')[0]}.csv`);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+        link.setAttribute('download', `invoices-${timestamp}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
@@ -177,9 +180,9 @@ function InvoicesPage() {
         // Helper function to properly escape CSV values
         const escapeCSV = (value) => {
           if (value === null || value === undefined) return '';
-          const stringValue = String(value);
+          const stringValue = String(value).trim();
           // If the value contains comma, quote, or newline, wrap it in quotes and escape internal quotes
-          if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+          if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
             return '"' + stringValue.replace(/"/g, '""') + '"';
           }
           return stringValue;
@@ -211,18 +214,21 @@ function InvoicesPage() {
             
             return row.map(escapeCSV).join(',');
           })
-        ].join('\r\n'); // Use \r\n for better Excel compatibility
+        ].join('\r\n'); // Use \r\n for better Excel compatibility on Windows
         
         // Add BOM (Byte Order Mark) for better Excel compatibility
         const BOM = '\uFEFF';
         const csvContentWithBOM = BOM + csvContent;
         
-        // Create and download the CSV file
-        const blob = new Blob([csvContentWithBOM], { type: 'text/csv;charset=utf-8;' });
+        // Create and download the CSV file with proper encoding
+        const blob = new Blob([csvContentWithBOM], { 
+          type: 'text/csv;charset=utf-8;' 
+        });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', `invoices-${new Date().toISOString().split('T')[0]}.csv`);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+        link.setAttribute('download', `invoices-${timestamp}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();

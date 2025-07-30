@@ -186,9 +186,13 @@ app.get('/api/export/excel', (req, res) => {
     ].join(','))
   ].join('\n');
   
-  res.setHeader('Content-Type', 'text/csv');
+  // Add BOM for Excel compatibility
+  const BOM = '\uFEFF';
+  const csvWithBOM = BOM + csvContent;
+  
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename=invoices.csv');
-  res.send(csvContent);
+  res.send(csvWithBOM);
 });
 
 app.listen(PORT, () => {
