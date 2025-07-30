@@ -2,7 +2,7 @@
     "rewrites": [
       {
         "source": "/api/:path*",
-        "destination": "https://consultancy-backend-1xug.vercel.app/api/:path*"
+        "destination": "https://hsoftworks.vercel.app/api/:path*"
       }
     ]
   }

@@ -13,12 +13,12 @@ export const login = (username, password) => {
 // Enhanced login function for email/password
 export const loginWithEmail = (email, password) => {
   // Tax consultancy credentials
-  if (email === 'consultancyforum@gmail.com' && password === 'ammad1976') {
-    const userData = {
-      name: 'Consultancy Forum Admin',
-      email: email,
-      role: 'admin'
-    };
+  if (email === 'hsoftworks36@gmail.com' && password === 'softwarecompany') {
+  const userData = {
+    name: 'HS Softworks Admin',
+    email: email,
+    role: 'admin'
+  };
     
     try {
       localStorage.setItem('token', 'dummy-token');

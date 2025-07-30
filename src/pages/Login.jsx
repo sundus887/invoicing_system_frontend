@@ -56,14 +56,11 @@ const Login = () => {
           <div className="flex flex-col items-center">
             {/* Logo Image */}
             <div className="mb-6">
-              <img src="/logo.jpg" alt="Consultancy Forum Logo" className="w-48 h-48 object-contain" />
+              <img src="/logo.jpg" alt="HS Softworks Logo" className="w-64 h-64 object-contain" />
             </div>
             <h2 className="text-3xl font-extrabold text-gray-900">
-              Consultancy Forum
+              HS Softworks
             </h2>
-            <p className="mt-2 text-sm text-gray-600">
-              Tax & Accounting Platform
-            </p>
           </div>
         </div>
         

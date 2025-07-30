@@ -1,4 +1,4 @@
-# Consultancy Forum - Tax & Accounting Platform
+# HS Softworks
 
 A React-based business management application for tax and accounting services.
 

@@ -12,10 +12,9 @@ const AppSidebar = () => {
         <div className="flex flex-col items-center">
           {/* Logo Image */}
           <div className="mb-4">
-            <img src="/logo.jpg" alt="Consultancy Forum Logo" className="w-36 h-36 object-contain" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800 text-center">Consultancy Forum</h1>
-          <p className="text-sm text-gray-600 mt-1 text-center">Tax & Accounting Platform</p>
+                    <img src="/logo.jpg" alt="HS Softworks Logo" className="w-32 h-32 object-contain" />
+      </div>
+            <h1 className="text-2xl font-bold text-gray-800 text-center">HS Softworks</h1>
         </div>
       </div>
 
@@ -46,7 +45,21 @@ const AppSidebar = () => {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M16 4c0-1.11.89-2 2-2s2 .89 2 2-.89 2-2 2-2-.89-2-2zm4 18v-6h2.5l-2.54-7.63A1.5 1.5 0 0 0 18.54 8H16c-.8 0-1.54.37-2.01 1l-4.7 6.3c-.37.5-.58 1.11-.58 1.73V20c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2z"/>
           </svg>
-          Client Management
+          Buyer Management
+        </Link>
+
+        <Link 
+          to="/sellers" 
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
+            location.pathname === "/sellers" 
+              ? "bg-black text-white" 
+              : "text-gray-700 hover:bg-gray-100"
+          }`}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+          Seller Management
         </Link>
 
         <Link 

@@ -59,7 +59,7 @@ function DashboardPage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">Welcome to Consultancy Forum</h2>
+      <h2 className="text-2xl font-bold mb-6">Welcome to HS Softworks</h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-xl shadow flex flex-col items-center">
@@ -72,7 +72,7 @@ function DashboardPage() {
         </div>
         <div className="bg-white p-6 rounded-xl shadow flex flex-col items-center">
           <span className="text-gray-500">Total Earnings</span>
-          <span className="text-2xl font-bold text-green-600">₹{stats.totalEarnings.toLocaleString()}</span>
+          <span className="text-2xl font-bold text-green-600">{stats.totalEarnings.toLocaleString()}</span>
         </div>
         <div className="bg-white p-6 rounded-xl shadow flex flex-col items-center">
           <span className="text-gray-500">Pending Tasks</span>

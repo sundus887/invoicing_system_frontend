@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Clients from "./pages/Clients";
 import ClientDetails from "./pages/ClientDetails";
 import AddClient from "./pages/AddClient";
+import AddSeller from "./pages/AddSeller";
 import Invoices from "./pages/Invoices";
 import AddInvoice from "./pages/AddInvoice";
 import Services from "./pages/Services";
@@ -42,6 +43,7 @@ const AppRoutes = () => (
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="clients" element={<Clients />} />
         <Route path="clients/:id" element={<ClientDetails />} />
+        <Route path="sellers" element={<AddSeller />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="add-invoice" element={<AddInvoice />} />
         <Route path="add-client" element={<AddClient />} />
