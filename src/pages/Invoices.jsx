@@ -118,125 +118,81 @@ function InvoicesPage() {
     try {
       setExportLoading(true);
       
-      // Try backend export first
-      try {
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-        console.log('🚀 Using API URL for export:', apiUrl);
+      // Client-side CSV export with proper encoding
+      console.log('🔄 Using client-side CSV export...');
         
-        const response = await fetch(`${apiUrl}/api/export/excel`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+      const headers = [
+        'Invoice #',
+        'Product',
+        'Units/Quantity',
+        'Unit Price Excluding GST',
+        'Total Value Excluding GST',
+        'Sales Tax',
+        'Extra Tax',
+        'Value including GST & Extra Tax',
+        'Date',
+        'Status'
+      ];
+      
+      // Helper function to properly escape CSV values
+      const escapeCSV = (value) => {
+        if (value === null || value === undefined) return '';
+        const stringValue = String(value).trim();
+        // If the value contains comma, quote, or newline, wrap it in quotes and escape internal quotes
+        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
+          return '"' + stringValue.replace(/"/g, '""') + '"';
         }
-
-        // Get the CSV data from backend
-        const csvData = await response.text();
-        
-        // Add BOM (Byte Order Mark) for better Excel compatibility if not already present
-        const BOM = '\uFEFF';
-        const csvDataWithBOM = csvData.startsWith(BOM) ? csvData : BOM + csvData;
-        
-        // Create and download the CSV file with proper encoding
-        const blob = new Blob([csvDataWithBOM], { 
-          type: 'text/csv;charset=utf-8;' 
-        });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
-        link.setAttribute('download', `invoices-${timestamp}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        // Success message
-        alert('Invoice data exported successfully as CSV!');
-        return;
-        
-      } catch (backendError) {
-        console.log('Backend export failed, using client-side fallback:', backendError);
-        
-        // Fallback to client-side CSV export with correct field names
-        const headers = [
-          'Invoice #',
-          'Product',
-          'Units/Quantity',
-          'Unit Price Excluding GST',
-          'Total Value Excluding GST',
-          'Sales Tax',
-          'Extra Tax',
-          'Value including GST & Extra Tax',
-          'Date',
-          'Status'
-        ];
-        
-        // Helper function to properly escape CSV values
-        const escapeCSV = (value) => {
-          if (value === null || value === undefined) return '';
-          const stringValue = String(value).trim();
-          // If the value contains comma, quote, or newline, wrap it in quotes and escape internal quotes
-          if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
-            return '"' + stringValue.replace(/"/g, '""') + '"';
-          }
-          return stringValue;
-        };
-        
-        const csvContent = [
-          headers.map(escapeCSV).join(','),
-          ...invoices.map(inv => {
-            // Use actual invoice data or calculate defaults
-            const unitPrice = parseFloat(inv.unitPrice) || 0;
-            const quantity = parseFloat(inv.units) || 1;
-            const totalValue = parseFloat(inv.totalValue) || (unitPrice * quantity);
-            const salesTax = parseFloat(inv.salesTax) || (totalValue * 0.18);
-            const extraTax = parseFloat(inv.extraTax) || 0;
-            const finalValue = parseFloat(inv.finalValue) || (totalValue + salesTax + extraTax);
-            
-            const row = [
-              inv.invoiceNumber || inv._id?.slice(-6) || 'N/A',
-              inv.product || inv.items?.[0]?.product || 'N/A',
-              quantity.toFixed(2),
-              unitPrice.toFixed(2),
-              totalValue.toFixed(2),
-              salesTax.toFixed(2),
-              extraTax.toFixed(2),
-              finalValue.toFixed(2),
-              inv.issuedDate ? new Date(inv.issuedDate).toLocaleDateString() : 'N/A',
-              inv.status || 'pending'
-            ];
-            
-            return row.map(escapeCSV).join(',');
-          })
-        ].join('\r\n'); // Use \r\n for better Excel compatibility on Windows
-        
-        // Add BOM (Byte Order Mark) for better Excel compatibility
-        const BOM = '\uFEFF';
-        const csvContentWithBOM = BOM + csvContent;
-        
-        // Create and download the CSV file with proper encoding
-        const blob = new Blob([csvContentWithBOM], { 
-          type: 'text/csv;charset=utf-8;' 
-        });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
-        link.setAttribute('download', `invoices-${timestamp}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        alert('Backend export failed. Invoice data exported as CSV instead.');
-      }
+        return stringValue;
+      };
+      
+      const csvContent = [
+        headers.map(escapeCSV).join(','),
+        ...invoices.map(inv => {
+          // Use actual invoice data or calculate defaults
+          const unitPrice = parseFloat(inv.unitPrice) || 0;
+          const quantity = parseFloat(inv.units) || 1;
+          const totalValue = parseFloat(inv.totalValue) || (unitPrice * quantity);
+          const salesTax = parseFloat(inv.salesTax) || (totalValue * 0.18);
+          const extraTax = parseFloat(inv.extraTax) || 0;
+          const finalValue = parseFloat(inv.finalValue) || (totalValue + salesTax + extraTax);
+          
+          const row = [
+            inv.invoiceNumber || inv._id?.slice(-6) || 'N/A',
+            inv.product || inv.items?.[0]?.product || 'N/A',
+            quantity.toFixed(2),
+            unitPrice.toFixed(2),
+            totalValue.toFixed(2),
+            salesTax.toFixed(2),
+            extraTax.toFixed(2),
+            finalValue.toFixed(2),
+            inv.issuedDate ? new Date(inv.issuedDate).toLocaleDateString() : 'N/A',
+            inv.status || 'pending'
+          ];
+          
+          return row.map(escapeCSV).join(',');
+        })
+      ].join('\r\n'); // Use \r\n for better Excel compatibility on Windows
+      
+      // Add BOM (Byte Order Mark) for better Excel compatibility
+      const BOM = '\uFEFF';
+      const csvContentWithBOM = BOM + csvContent;
+      
+      // Create and download the CSV file with proper encoding
+      const blob = new Blob([csvContentWithBOM], { 
+        type: 'text/csv;charset=utf-8;' 
+      });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+      link.setAttribute('download', `invoices-${timestamp}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      alert('Invoice data exported successfully as CSV!');
     } catch (error) {
       console.error('Export failed:', error);
       alert('Failed to export invoice data. Please try again.');
