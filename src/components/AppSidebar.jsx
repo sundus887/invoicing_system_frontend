@@ -6,15 +6,14 @@ const AppSidebar = () => {
 
   return (
     <div className="w-64 bg-white shadow-lg min-h-screen">
-      {/* App Header */}
-      <div className="p-6 border-b">
-        {/* Logo positioned above app name */}
-        <div className="flex flex-col items-center">
-          {/* Logo Image */}
-          <div className="mb-4">
-                    <img src="/logo.jpg" alt="HS Softworks Logo" className="w-32 h-32 object-contain" />
-      </div>
-            <h1 className="text-2xl font-bold text-gray-800 text-center">HS Softworks</h1>
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200">
+        <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+          <span className="text-white font-bold text-sm">IS</span>
+        </div>
+        <div>
+          <h1 className="font-bold text-lg">InvoSync</h1>
+          <p className="text-xs text-gray-500">Invoice Management</p>
         </div>
       </div>
 

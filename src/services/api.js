@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Use Vercel backend URL directly (no environment variable dependency)
-const API_URL = 'https://hsoftworks.vercel.app';
+// Use local backend for testing
+const API_URL = 'http://localhost:5000';
 
 console.log('🚀 Using API URL:', API_URL);
 console.log('🌍 Environment:', process.env.NODE_ENV);

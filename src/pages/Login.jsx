@@ -54,13 +54,16 @@ const Login = () => {
         <div>
           {/* Logo positioned above app name */}
           <div className="flex flex-col items-center">
-            {/* Logo Image */}
+            {/* Logo */}
             <div className="mb-6">
-              <img src="/logo.jpg" alt="HS Softworks Logo" className="w-64 h-64 object-contain" />
+              <div className="w-16 h-16 bg-black rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-2xl">IS</span>
+              </div>
             </div>
             <h2 className="text-3xl font-extrabold text-gray-900">
-              HS Softworks
+              InvoSync
             </h2>
+            <p className="text-gray-600 mt-2">Professional Invoice Management</p>
           </div>
         </div>
         

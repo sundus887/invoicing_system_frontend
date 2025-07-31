@@ -1,64 +1,44 @@
-# HS Softworks
+# InvoSync
 
-A React-based business management application for tax and accounting services.
+A professional invoice management system built with React.js and Node.js.
 
-## Setup Instructions
+## Features
 
-### 1. Environment Configuration
+- **Invoice Management**: Create, edit, and manage invoices
+- **Client Management**: Manage buyer and seller information
+- **FBR Integration**: Submit invoices to Federal Board of Revenue
+- **Export Functionality**: Export data in CSV, Excel, and PDF formats
+- **Dashboard Analytics**: View key statistics and insights
 
-Create a `.env` file in the root directory with the following variables:
+## Technology Stack
 
-```env
-# API Configuration
-REACT_APP_API_URL=https://consultancy-backend-1xug.vercel.app/
+- **Frontend**: React.js, Tailwind CSS
+- **Backend**: Node.js, Express.js
+- **Database**: MongoDB (or your preferred database)
+- **Deployment**: Vercel
 
-# Development settings
-REACT_APP_ENV=development
-REACT_APP_DEBUG=true
-```
+## Getting Started
 
-### 2. Install Dependencies
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd invo-sync
+   ```
 
-```bash
-npm install
-```
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-### 3. Start Development Server
+3. **Start the development server**
+   ```bash
+   npm start
+   ```
 
-```bash
-npm start
-```
-
-## Troubleshooting
-
-### API Connection Issues
-
-If you're seeing 404 errors or "Failed to load services from backend" messages:
-
-1. **Check Backend Status**: Verify that the backend API at `https://consultancy-backend-1xug.vercel.app/` is running and accessible.
-
-2. **Verify Endpoints**: The backend should have the following endpoints:
-   - `GET /clients` - Fetch all clients
-   - `POST /clients` - Create a new client
-   - `GET /services` - Fetch all services
-   - `POST /services` - Create a new service
-
-3. **Environment Variables**: Ensure your `.env` file is properly configured with `REACT_APP_API_URL`.
-
-4. **CORS Issues**: If the backend is running locally, make sure CORS is properly configured.
-
-### Common Error Solutions
-
-- **"API URL: undefined"**: Create a `.env` file with `REACT_APP_API_URL`
-- **404 Errors**: Check if the backend endpoints exist and are accessible
-- **Network Errors**: Verify the backend URL is correct and the server is running
-
-## Available Scripts
-
-- `npm start` - Runs the app in development mode
-- `npm run build` - Builds the app for production
-- `npm test` - Launches the test runner
-- `npm run eject` - Ejects from Create React App (not recommended)
+4. **Build for production**
+   ```bash
+   npm run build
+   ```
 
 ## Project Structure
 
@@ -66,15 +46,17 @@ If you're seeing 404 errors or "Failed to load services from backend" messages:
 src/
 ├── components/     # Reusable UI components
 ├── pages/         # Page components
-├── services/      # API and utility services
-└── routes.js      # Application routing
+├── services/      # API services
+└── routes/        # Routing configuration
 ```
 
-## Features
+## Deployment
 
-- Client Management
-- Service Management
-- Invoice Generation
-- Dashboard Analytics
-- User Role Management
-- FBR e-Invoicing Integration
+The app is configured for deployment on Vercel with:
+- React 18 compatibility
+- Proper build configuration
+- Environment variable support
+
+## License
+
+MIT License

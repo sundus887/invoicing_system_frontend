@@ -380,16 +380,16 @@ function ClientsPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
-              </tr>
-            </thead>
+                </tr>
+              </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {clients.length === 0 ? (
-                <tr>
+                {clients.length === 0 ? (
+                  <tr>
                   <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
                     No buyers found
-                  </td>
-                </tr>
-              ) : (
+                    </td>
+                  </tr>
+                ) : (
                 clients.map((client, index) => (
                   <tr key={client._id || client.id || index} className="bg-white border-b hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">

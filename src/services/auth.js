@@ -14,11 +14,29 @@ export const login = (username, password) => {
 export const loginWithEmail = (email, password) => {
   // Tax consultancy credentials
   if (email === 'hsoftworks36@gmail.com' && password === 'softwarecompany') {
-  const userData = {
-    name: 'HS Softworks Admin',
-    email: email,
-    role: 'admin'
-  };
+    const userData = {
+      name: 'HS Softworks Admin',
+      email: email,
+      role: 'admin'
+    };
+    
+    try {
+      localStorage.setItem('token', 'dummy-token');
+      localStorage.setItem('user', JSON.stringify(userData));
+      return true;
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
+      return false;
+    }
+  }
+  
+  // Add your credentials
+  if (email === 'hamda09@gmail.com' && password === 'your_password_here') {
+    const userData = {
+      name: 'Hamda Admin',
+      email: email,
+      role: 'admin'
+    };
     
     try {
       localStorage.setItem('token', 'dummy-token');

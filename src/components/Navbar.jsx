@@ -20,8 +20,8 @@ const Navbar = () => {
   return (
     <nav className="bg-white shadow-sm border-b px-6 py-3 flex justify-between items-center">
       {/* Left side - can be used for breadcrumbs or page title */}
-      <div className="flex items-center">
-        {/* Removed the "Dashboard" text */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-gray-800">InvoSync</h1>
       </div>
       
       {/* Right side - Logout only */}
