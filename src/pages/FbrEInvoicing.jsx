@@ -8,7 +8,11 @@ function FbrEInvoicingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [clients, setClients] = useState([]);
+  
+  // New state for invoice number selection
+  const [availableInvoices, setAvailableInvoices] = useState([]);
+  const [selectedInvoiceNumber, setSelectedInvoiceNumber] = useState('');
+  const [isLoadingInvoice, setIsLoadingInvoice] = useState(false);
   
   // FBR API Settings state
   const [apiSettings, setApiSettings] = useState({
@@ -20,38 +24,56 @@ function FbrEInvoicingPage() {
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
 
-  // Form state with HS code support
+  // Updated form state for auto-population
   const [form, setForm] = useState({
-    client: '',
-    amount: '',
+    totalAmount: '',
     salesTax: '',
     extraTax: '',
-    fbrEnvironment: 'sandbox',
-    items: [
-      {
-        description: '',
-        hsCode: '',
-        quantity: 1,
-        unitPrice: '',
-        totalValue: '',
-        salesTax: ''
-      }
-    ]
+    items: []
   });
 
-  // Fetch FBR invoices
+  // Fetch available invoices for FBR submission
+  const fetchAvailableInvoices = async () => {
+    try {
+      console.log('🔄 Fetching available invoices for FBR...');
+      const response = await api.get('/api/fbrinvoices/available-invoices');
+      console.log('✅ Available invoices loaded:', response.data);
+      if (response.data.success) {
+        setAvailableInvoices(response.data.invoices);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching available invoices:', err);
+    }
+  };
+
+  // Fetch FBR invoices (submissions)
   const fetchInvoices = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get('/api/fbrinvoices');
-      console.log('✅ FBR invoices loaded:', response.data);
-      setInvoices(response.data);
+      const response = await api.get('/api/fbrinvoices/submissions');
+      console.log('✅ FBR submissions loaded:', response.data);
+      if (response.data.success) {
+        setInvoices(response.data.submissions);
+      }
     } catch (err) {
-      console.error('❌ Error fetching FBR invoices:', err);
-      setError('Failed to load FBR invoices. Please try again.');
+      console.error('❌ Error fetching FBR submissions:', err);
+      setError('Failed to load FBR submissions. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch pending invoices
+  const fetchPendingInvoices = async () => {
+    try {
+      const response = await api.get('/api/fbrinvoices/pending');
+      console.log('✅ Pending invoices loaded:', response.data);
+      if (response.data.success) {
+        setInvoices(response.data.pendingInvoices);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching pending invoices:', err);
     }
   };
 
@@ -63,18 +85,6 @@ function FbrEInvoicingPage() {
       setSummary(response.data);
     } catch (err) {
       console.error('❌ Error fetching FBR summary:', err);
-    }
-  };
-
-  // Fetch clients for the form
-  const fetchClients = async () => {
-    try {
-      console.log('🔄 Fetching clients...');
-      const response = await api.get('/api/clients');
-      console.log('✅ Clients loaded:', response.data);
-      setClients(response.data);
-    } catch (err) {
-      console.error('❌ Error fetching clients:', err);
     }
   };
 
@@ -111,88 +121,168 @@ function FbrEInvoicingPage() {
     }
   };
 
-  // Handle form submission with HS code validation
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      console.log('🔄 Submitting FBR invoice with HS codes:', form);
-      
-      // Validate HS codes
-      const invalidItems = form.items.filter(item => !item.hsCode || !/^\d{4}\.\d{2}\.\d{2}$/.test(item.hsCode));
-      if (invalidItems.length > 0) {
-        alert('Please enter valid HS codes for all items (format: XXXX.XX.XX)');
-        return;
-      }
-      
-      const response = await api.post('/api/fbrinvoices', form);
-      console.log('✅ FBR invoice created:', response.data);
-      
-      setShowForm(false);
+  // Handle invoice number selection and auto-populate form
+  const handleInvoiceNumberChange = async (invoiceNumber) => {
+    setSelectedInvoiceNumber(invoiceNumber);
+    
+    if (!invoiceNumber) {
+      // Clear form if no invoice selected
       setForm({
-        client: '',
-        amount: '',
+        totalAmount: '',
         salesTax: '',
         extraTax: '',
-        fbrEnvironment: 'sandbox',
-        items: [
-          {
-            description: '',
-            hsCode: '',
-            quantity: 1,
-            unitPrice: '',
-            totalValue: '',
-            salesTax: ''
-          }
-        ]
+        items: []
       });
+      return;
+    }
+    
+    setIsLoadingInvoice(true);
+    try {
+      console.log('🔄 Fetching invoice data for:', invoiceNumber);
+      const response = await api.get(`/api/fbrinvoices/invoice/${invoiceNumber}`);
+      console.log('✅ Invoice data loaded:', response.data);
       
-      await fetchInvoices();
+      if (response.data.success) {
+        const invoice = response.data.invoice;
+        // Auto-populate form fields
+        setForm({
+          totalAmount: invoice.totalAmount || '',
+          salesTax: invoice.salesTax || '',
+          extraTax: invoice.extraTax || '',
+          items: invoice.items || [] // Already includes HS codes
+        });
+        
+        alert('✅ Invoice data loaded successfully!');
+      }
     } catch (err) {
-      console.error('❌ Error creating FBR invoice:', err);
-      alert('Failed to create FBR invoice. Please try again.');
+      console.error('❌ Error fetching invoice data:', err);
+      alert('❌ Error loading invoice data');
+    } finally {
+      setIsLoadingInvoice(false);
     }
   };
 
-  // Handle form field changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  // Test backend connectivity
+  const testBackendConnection = async () => {
+    try {
+      console.log('🔍 Testing backend connectivity...');
+      const response = await api.get('/api/health');
+      console.log('✅ Backend is reachable:', response.data);
+      return true;
+    } catch (err) {
+      console.error('❌ Backend connectivity test failed:', err);
+      return false;
+    }
   };
 
-  // Handle item changes including HS code
-  const handleItemChange = (index, field, value) => {
-    setForm(prev => ({
-      ...prev,
-      items: prev.items.map((item, i) => 
-        i === index ? { ...item, [field]: value } : item
-      )
-    }));
+  // Handle form submission with new API endpoint
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!selectedInvoiceNumber) {
+      alert('Please select an invoice number first');
+      return;
+    }
+    
+    // Test backend connectivity first
+    const isBackendReachable = await testBackendConnection();
+    if (!isBackendReachable) {
+      alert('❌ Cannot connect to the backend server. Please check your internet connection or try again later.');
+      return;
+    }
+    
+    try {
+      console.log('🔄 Submitting FBR invoice:', selectedInvoiceNumber);
+      console.log('📋 API Settings:', apiSettings);
+      console.log('📋 Form Data:', form);
+      
+      const requestData = {
+        invoiceNumber: selectedInvoiceNumber,
+        sandbox: apiSettings.environment === 'sandbox'
+      };
+      
+      console.log('📤 Request data being sent:', requestData);
+      
+      const response = await api.post('/api/fbrinvoices/create-from-invoice', requestData);
+      
+      console.log('✅ FBR invoice created:', response.data);
+      
+      if (response.data.success) {
+        alert(`✅ FBR Invoice submitted successfully!\nReference: ${response.data.fbrReference}`);
+        
+        // Clear form and refresh data
+        setSelectedInvoiceNumber('');
+        setForm({
+          totalAmount: '',
+          salesTax: '',
+          extraTax: '',
+          items: []
+        });
+        
+        // Refresh available invoices
+        await fetchAvailableInvoices();
+        
+        // Refresh submissions if on submissions tab
+        if (tab === 'submissions') {
+          await fetchInvoices();
+        }
+      }
+    } catch (err) {
+      console.error('❌ Error creating FBR invoice:', err);
+      
+      // Show more detailed error information
+      let errorMessage = 'Failed to create FBR invoice. Please try again.';
+      
+      if (err.response) {
+        // Server responded with error status
+        console.error('Server error:', err.response.status, err.response.data);
+        errorMessage = `Server error (${err.response.status}): ${err.response.data?.message || 'Unknown server error'}`;
+      } else if (err.request) {
+        // Request was made but no response received
+        console.error('Network error:', err.request);
+        errorMessage = 'Network error: Unable to connect to the server. Please check your internet connection.';
+      } else {
+        // Something else happened
+        console.error('Other error:', err.message);
+        errorMessage = `Error: ${err.message}`;
+      }
+      
+      alert(`❌ ${errorMessage}`);
+    }
   };
 
-  // Add new item with HS code field
-  const addItem = () => {
-    setForm(prev => ({
-      ...prev,
-      items: [...prev.items, {
-        description: '',
-        hsCode: '',
-        quantity: 1,
-        unitPrice: '',
-        totalValue: '',
-        salesTax: ''
-      }]
-    }));
+  // Generate FBR invoice PDF
+  const generateFBRInvoice = async () => {
+    if (!selectedInvoiceNumber) {
+      alert('Please select an invoice number first');
+      return;
+    }
+    
+    try {
+      // Open PDF in new window/tab
+      window.open(`/api/fbrinvoices/generate-pdf/${selectedInvoiceNumber}`, '_blank');
+    } catch (err) {
+      console.error('❌ Error generating PDF:', err);
+      alert('❌ Error generating PDF');
+    }
   };
 
-  // Remove item
-  const removeItem = (index) => {
-    setForm(prev => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index)
-    }));
+  // Retry FBR submission
+  const retryFBRSubmission = async (fbrInvoiceId) => {
+    try {
+      const response = await api.post(`/api/fbrinvoices/${fbrInvoiceId}/retry`);
+      console.log('✅ FBR submission retry result:', response.data);
+      
+      if (response.data.success) {
+        alert('✅ FBR submission retry successful!');
+        await fetchInvoices(); // Refresh submissions
+      } else {
+        alert(`❌ Retry failed: ${response.data.message}`);
+      }
+    } catch (err) {
+      console.error('❌ Error retrying submission:', err);
+      alert('❌ Error retrying submission');
+    }
   };
 
   // Save FBR API Settings
@@ -208,7 +298,7 @@ function FbrEInvoicingPage() {
       setTimeout(() => setSettingsSaved(false), 3000);
     } catch (err) {
       console.error('❌ Error saving FBR API settings:', err);
-      alert('Failed to save FBR API settings. Please try again.');
+      alert('❌ Failed to save FBR API settings. Please try again.');
     } finally {
       setSettingsLoading(false);
     }
@@ -233,18 +323,31 @@ function FbrEInvoicingPage() {
     setSettingsSaved(false);
   };
 
+  // Load data based on active tab
+  const loadTabData = async () => {
+    if (tab === 'submissions') {
+      await fetchInvoices();
+    } else if (tab === 'pending') {
+      await fetchPendingInvoices();
+    } else if (tab === 'create') {
+      await fetchAvailableInvoices();
+    }
+  };
+
   useEffect(() => {
-    fetchInvoices();
     fetchSummary();
-    fetchClients();
     fetchApiSettings();
   }, []);
 
-  if (loading) {
+  useEffect(() => {
+    loadTabData();
+  }, [tab]);
+
+  if (loading && tab === 'submissions') {
     return <div className="text-center py-8">Loading FBR e-invoicing...</div>;
   }
 
-  if (error) {
+  if (error && tab === 'submissions') {
     return (
       <div className="text-center py-8">
         <div className="text-red-600 mb-4">{error}</div>
@@ -287,29 +390,37 @@ function FbrEInvoicingPage() {
           <h2 className="text-xl font-semibold mb-4">Create New FBR Invoice</h2>
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <select
-                name="client"
-                value={form.client}
-                onChange={handleChange}
-                className="border p-2 rounded"
-                required
-              >
-                <option value="">Select Client</option>
-                {clients.map(client => (
-                  <option key={client._id} value={client._id}>
-                    {client.companyName} - {client.buyerSTRN}
-                  </option>
-                ))}
-              </select>
+              {/* Invoice Number Selection */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select Invoice Number *
+                </label>
+                <select
+                  value={selectedInvoiceNumber}
+                  onChange={(e) => handleInvoiceNumberChange(e.target.value)}
+                  className="w-full border p-2 rounded"
+                  required
+                  disabled={isLoadingInvoice}
+                >
+                  <option value="">Select Invoice Number</option>
+                  {availableInvoices.map(invoice => (
+                    <option key={invoice.invoiceNumber} value={invoice.invoiceNumber}>
+                      {invoice.invoiceNumber} - {invoice.buyerName} - Rs. {invoice.totalAmount}
+                    </option>
+                  ))}
+                </select>
+                {isLoadingInvoice && (
+                  <div className="text-blue-600 text-sm mt-1">Loading invoice data...</div>
+                )}
+              </div>
               
               <input
                 type="number"
-                name="amount"
+                name="totalAmount"
                 placeholder="Total Amount"
-                value={form.amount}
-                onChange={handleChange}
-                className="border p-2 rounded"
-                required
+                value={form.totalAmount}
+                readOnly
+                className="border p-2 rounded bg-gray-50"
               />
               
               <input
@@ -317,9 +428,8 @@ function FbrEInvoicingPage() {
                 name="salesTax"
                 placeholder="Sales Tax"
                 value={form.salesTax}
-                onChange={handleChange}
-                className="border p-2 rounded"
-                required
+                readOnly
+                className="border p-2 rounded bg-gray-50"
               />
               
               <input
@@ -327,14 +437,14 @@ function FbrEInvoicingPage() {
                 name="extraTax"
                 placeholder="Extra Tax"
                 value={form.extraTax}
-                onChange={handleChange}
-                className="border p-2 rounded"
+                readOnly
+                className="border p-2 rounded bg-gray-50"
               />
               
               <select
                 name="fbrEnvironment"
-                value={form.fbrEnvironment}
-                onChange={handleChange}
+                value={apiSettings.environment}
+                onChange={(e) => handleApiSettingChange('environment', e.target.value)}
                 className="border p-2 rounded"
               >
                 <option value="sandbox">Sandbox</option>
@@ -342,98 +452,75 @@ function FbrEInvoicingPage() {
               </select>
             </div>
 
-            {/* Items Section with HS Code */}
-            <div className="mb-4">
-              <h3 className="text-lg font-medium mb-2">Items (with HS Codes)</h3>
-              {form.items.map((item, index) => (
-                <div key={index} className="border p-4 rounded mb-2 bg-gray-50">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
-                    <input
-                      type="text"
-                      placeholder="Description"
-                      value={item.description}
-                      onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                      className="border p-2 rounded"
-                      required
-                    />
-                    <input
-                      type="text"
-                      placeholder="HS Code (e.g., 8517.12.00)"
-                      value={item.hsCode}
-                      onChange={(e) => handleItemChange(index, 'hsCode', e.target.value)}
-                      className="border p-2 rounded"
-                      required
-                      pattern="^\d{4}\.\d{2}\.\d{2}$"
-                      title="Format: XXXX.XX.XX"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Quantity"
-                      value={item.quantity}
-                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                      className="border p-2 rounded"
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <input
-                      type="number"
-                      placeholder="Unit Price"
-                      value={item.unitPrice}
-                      onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value)}
-                      className="border p-2 rounded"
-                      required
-                    />
-                    <input
-                      type="number"
-                      placeholder="Total Value"
-                      value={item.totalValue}
-                      onChange={(e) => handleItemChange(index, 'totalValue', e.target.value)}
-                      className="border p-2 rounded"
-                      required
-                    />
-                    <input
-                      type="number"
-                      placeholder="Sales Tax"
-                      value={item.salesTax}
-                      onChange={(e) => handleItemChange(index, 'salesTax', e.target.value)}
-                      className="border p-2 rounded"
-                      required
-                    />
-                  </div>
-                  {form.items.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeItem(index)}
-                      className="text-red-600 text-sm mt-2"
-                    >
-                      Remove Item
-                    </button>
-                  )}
+            {/* Items Section with HS Code Display */}
+            {form.items && form.items.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-lg font-medium mb-2">Items (with Auto-Assigned HS Codes)</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-300 p-2 text-left">S. No.</th>
+                        <th className="border border-gray-300 p-2 text-left">Description</th>
+                        <th className="border border-gray-300 p-2 text-left">HS Code</th>
+                        <th className="border border-gray-300 p-2 text-left">Quantity</th>
+                        <th className="border border-gray-300 p-2 text-left">Rate</th>
+                        <th className="border border-gray-300 p-2 text-left">Amount</th>
+                        <th className="border border-gray-300 p-2 text-left">Discount</th>
+                        <th className="border border-gray-300 p-2 text-left">Net Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {form.items.map((item, index) => (
+                        <tr key={index}>
+                          <td className="border border-gray-300 p-2">{index + 1}</td>
+                          <td className="border border-gray-300 p-2">{item.description || item.product}</td>
+                          <td className="border border-gray-300 p-2 font-mono">{item.hsCode || '9983.99.00'}</td>
+                          <td className="border border-gray-300 p-2">{item.quantity}</td>
+                          <td className="border border-gray-300 p-2">{item.unitPrice}</td>
+                          <td className="border border-gray-300 p-2">{item.totalValue}</td>
+                          <td className="border border-gray-300 p-2">{item.discount || 0}</td>
+                          <td className="border border-gray-300 p-2">{item.finalValue}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-              <button
-                type="button"
-                onClick={addItem}
-                className="text-blue-600 text-sm"
-              >
-                + Add Another Item
-              </button>
-            </div>
+              </div>
+            )}
 
             <div className="flex gap-2">
               <button
                 type="submit"
-                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                disabled={!selectedInvoiceNumber || isLoadingInvoice}
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
               >
-                Create FBR Invoice
+                {isLoadingInvoice ? 'Loading...' : 'Create FBR Invoice'}
               </button>
+              
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={generateFBRInvoice}
+                disabled={!selectedInvoiceNumber}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                Generate FBR Invoice PDF
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedInvoiceNumber('');
+                  setForm({
+                    totalAmount: '',
+                    salesTax: '',
+                    extraTax: '',
+                    items: []
+                  });
+                }}
                 className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
               >
-                Cancel
+                Clear
               </button>
             </div>
           </form>
@@ -467,53 +554,58 @@ function FbrEInvoicingPage() {
             </div>
           </div>
 
-          {/* Invoices List with HS Code Display */}
+          {/* FBR Submissions List */}
           <div className="mt-8">
-            <h3 className="text-lg font-bold mb-2">FBR Invoices</h3>
+            <h3 className="text-lg font-bold mb-2">FBR Submissions</h3>
             {invoices.length === 0 ? (
-              <div className="text-gray-500">No invoices found.</div>
+              <div className="text-gray-500">No FBR submissions found.</div>
             ) : (
               invoices.map(inv => (
                 <div key={inv._id} className="bg-white rounded-lg shadow p-4 mb-2">
-                  <div><span className="font-semibold">Invoice #:</span> {inv.invoiceNumber || 'N/A'}</div>
-                  <div><span className="font-semibold">Status:</span> 
-                    <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                      inv.status === 'accepted' ? 'bg-green-100 text-green-800' : 
-                      inv.status === 'rejected' ? 'bg-red-100 text-red-800' : 
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {inv.status || 'pending'}
-                    </span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div><span className="font-semibold">Invoice #:</span> {inv.invoiceNumber || 'N/A'}</div>
+                    <div><span className="font-semibold">FBR Reference:</span> {inv.fbrReference || 'N/A'}</div>
+                    <div><span className="font-semibold">Status:</span> 
+                      <span className={`ml-2 px-2 py-1 rounded text-xs ${
+                        inv.status === 'accepted' ? 'bg-green-100 text-green-800' : 
+                        inv.status === 'rejected' ? 'bg-red-100 text-red-800' : 
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {inv.status || 'pending'}
+                      </span>
+                    </div>
+                    <div><span className="font-semibold">Buyer:</span> {inv.buyerName || 'N/A'}</div>
+                    <div><span className="font-semibold">Seller:</span> {inv.sellerName || 'N/A'}</div>
+                    <div><span className="font-semibold">Amount:</span> Rs. {inv.totalAmount || 0}</div>
+                    <div><span className="font-semibold">Environment:</span> {inv.environment || 'sandbox'}</div>
+                    <div><span className="font-semibold">Submission Date:</span> 
+                      {inv.submissionDate ? new Date(inv.submissionDate).toLocaleDateString() : 'N/A'}
+                    </div>
                   </div>
-                  <div><span className="font-semibold">Client:</span> {inv.client?.companyName || inv.client?.name || 'N/A'}</div>
-                  <div><span className="font-semibold">Amount:</span> {inv.amount || inv.finalAmount || 0}</div>
-                  <div><span className="font-semibold">Environment:</span> {inv.fbrEnvironment || 'sandbox'}</div>
-                  
-                  {/* HS Code Display */}
-                  {inv.hsCode && (
-                    <div><span className="font-semibold">HS Code:</span> {inv.hsCode}</div>
-                  )}
                   
                   {/* Items with HS Codes */}
                   {inv.items && inv.items.length > 0 && (
-                    <div className="mt-2">
+                    <div className="mt-3">
                       <span className="font-semibold">Items:</span>
                       <div className="ml-4 mt-1">
                         {inv.items.map((item, idx) => (
                           <div key={idx} className="text-sm text-gray-600">
-                            • {item.description} - HS: {item.hsCode} - Qty: {item.quantity} - {item.totalValue}
+                            • {item.description} - HS: {item.hsCode} - Qty: {item.quantity} - Rs. {item.totalValue}
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
                   
-                  <div><span className="font-semibold">Submission Date:</span> 
-                    {inv.submissionDate ? new Date(inv.submissionDate).toLocaleDateString() : 'N/A'}
-                  </div>
-                  <div><span className="font-semibold">Created:</span> 
-                    {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : 'N/A'}
-                  </div>
+                  {/* Retry button for failed submissions */}
+                  {inv.status === 'rejected' && (
+                    <button 
+                      onClick={() => retryFBRSubmission(inv._id)}
+                      className="mt-2 bg-orange-600 text-white px-4 py-1 rounded text-sm hover:bg-orange-700"
+                    >
+                      Retry Submission
+                    </button>
+                  )}
                 </div>
               ))
             )}
@@ -523,42 +615,39 @@ function FbrEInvoicingPage() {
 
       {tab === "pending" && (
         <div>
-          <h3 className="text-lg font-bold mb-2">Pending Invoices</h3>
-          {invoices.filter(inv => inv.status === "pending").length === 0 ? (
+          <h3 className="text-lg font-bold mb-2">Pending Invoices (Not Yet Submitted to FBR)</h3>
+          {invoices.length === 0 ? (
             <div className="text-gray-500">No pending invoices found.</div>
           ) : (
-            invoices.filter(inv => inv.status === "pending").map(inv => (
+            invoices.map(inv => (
               <div key={inv._id} className="bg-white rounded-lg shadow p-4 mb-2">
-                <div><span className="font-semibold">Invoice #:</span> {inv.invoiceNumber || 'N/A'}</div>
-                <div><span className="font-semibold">Client:</span> {inv.client?.companyName || inv.client?.name || 'N/A'}</div>
-                <div><span className="font-semibold">Amount:</span> {inv.amount || inv.finalAmount || 0}</div>
-                <div><span className="font-semibold">Environment:</span> {inv.fbrEnvironment || 'sandbox'}</div>
-                
-                {/* HS Code Display */}
-                {inv.hsCode && (
-                  <div><span className="font-semibold">HS Code:</span> {inv.hsCode}</div>
-                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div><span className="font-semibold">Invoice #:</span> {inv.invoiceNumber || 'N/A'}</div>
+                  <div><span className="font-semibold">Buyer:</span> {inv.buyerName || 'N/A'}</div>
+                  <div><span className="font-semibold">Seller:</span> {inv.sellerName || 'N/A'}</div>
+                  <div><span className="font-semibold">Amount:</span> Rs. {inv.totalAmount || 0}</div>
+                  <div><span className="font-semibold">Created Date:</span> 
+                    {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : 'N/A'}
+                  </div>
+                </div>
                 
                 {/* Items with HS Codes */}
                 {inv.items && inv.items.length > 0 && (
-                  <div className="mt-2">
+                  <div className="mt-3">
                     <span className="font-semibold">Items:</span>
                     <div className="ml-4 mt-1">
                       {inv.items.map((item, idx) => (
                         <div key={idx} className="text-sm text-gray-600">
-                          • {item.description} - HS: {item.hsCode} - Qty: {item.quantity} - {item.totalValue}
+                          • {item.description} - HS: {item.hsCode} - Qty: {item.quantity} - Rs. {item.totalValue}
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
                 
-                <div><span className="font-semibold">Created Date:</span> 
-                  {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : 'N/A'}
+                <div className="mt-3 text-sm text-blue-600">
+                  💡 This invoice is ready for FBR submission. Go to "Create FBR Invoice" tab to submit it.
                 </div>
-                <button className="mt-2 bg-blue-600 text-white px-4 py-1 rounded text-sm hover:bg-blue-700">
-                  Submit to FBR
-                </button>
               </div>
             ))
           )}

@@ -1,9 +1,10 @@
 import axios from 'axios';
 
-// Use environment variable with fallback
-const API_URL = process.env.REACT_APP_API_URL || 'https://hsoftworks.vercel.app';
+// Use Vercel backend URL directly (no environment variable dependency)
+const API_URL = 'https://hsoftworks.vercel.app';
 
 console.log('🚀 Using API URL:', API_URL);
+console.log('🌍 Environment:', process.env.NODE_ENV);
 
 const api = axios.create({
   baseURL: API_URL,

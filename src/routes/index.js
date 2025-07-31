@@ -10,6 +10,8 @@ import Invoices from '../pages/Invoices';
 import FbrEInvoicing from '../pages/FbrEInvoicing';
 import UserRoles from '../pages/UserRoles';
 import Settings from '../pages/Settings';
+import ExportPage from '../pages/ExportPage';
+import AddSeller from '../pages/AddSeller';
 
 const AppRoutes = () => {
   return (
@@ -27,11 +29,13 @@ const AppRoutes = () => {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="clients" element={<Clients />} />
+          <Route path="sellers" element={<AddSeller />} />
           <Route path="services" element={<Services />} />
           <Route path="invoices" element={<Invoices />} />
           <Route path="fbr-e-invoicing" element={<FbrEInvoicing />} />
           <Route path="user-roles" element={<UserRoles />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="export" element={<ExportPage />} />
         </Route>
         
         {/* Catch all - redirect to login */}

@@ -119,6 +119,20 @@ const AppSidebar = () => {
           </svg>
           User Roles
         </Link>
+
+        <Link 
+          to="/export" 
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
+            location.pathname === "/export" 
+              ? "bg-black text-white" 
+              : "text-gray-700 hover:bg-gray-100"
+          }`}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+          </svg>
+          Export Data
+        </Link>
       </nav>
     </div>
   );
