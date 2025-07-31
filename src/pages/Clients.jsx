@@ -85,14 +85,14 @@ function ClientsPage() {
       const response = await api.post('/api/clients', buyerForm);
       console.log('✅ Buyer added successfully:', response.data);
       
-             setShowForm(false);
-       setBuyerForm({
-         companyName: "",
-         buyerSTRN: "",
-         buyerNTN: "",
-         address: "",
-         truckNo: "",
-       });
+      setShowForm(false);
+      setBuyerForm({
+        companyName: "",
+        buyerSTRN: "",
+        buyerNTN: "",
+        address: "",
+        truckNo: "",
+      });
        setError(null);
       await fetchClients();
     } catch (err) {
@@ -259,7 +259,7 @@ function ClientsPage() {
           Add Buyer
         </button>
       </div>
-
+      
       {showForm && (
         <div className="bg-white p-6 rounded-xl shadow mb-6">
           <h3 className="text-lg font-semibold mb-4">
@@ -271,59 +271,59 @@ function ClientsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Company Name *
                 </label>
-                <input
+              <input 
                   type="text"
-                  name="companyName"
-                  value={buyerForm.companyName}
-                  onChange={handleBuyerChange}
+                name="companyName" 
+                value={buyerForm.companyName} 
+                onChange={handleBuyerChange} 
                   className="w-full border p-2 rounded"
-                  required
-                />
+                required 
+              />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Buyer STRN *
                 </label>
-                <input
+              <input 
                   type="text"
-                  name="buyerSTRN"
-                  value={buyerForm.buyerSTRN}
-                  onChange={handleBuyerChange}
+                name="buyerSTRN" 
+                value={buyerForm.buyerSTRN} 
+                onChange={handleBuyerChange} 
                   className="w-full border p-2 rounded"
-                  required
-                />
+                required 
+              />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Buyer NTN *
                 </label>
-                <input
+              <input 
                   type="text"
-                  name="buyerNTN"
-                  value={buyerForm.buyerNTN}
-                  onChange={handleBuyerChange}
+                name="buyerNTN" 
+                value={buyerForm.buyerNTN} 
+                onChange={handleBuyerChange} 
                   className="w-full border p-2 rounded"
-                  required
-                />
+                required 
+              />
               </div>
                              <div>
                  <label className="block text-sm font-medium text-gray-700 mb-1">
                    Address *
                  </label>
-                 <input
+              <input 
                    type="text"
-                   name="address"
-                   value={buyerForm.address}
-                   onChange={handleBuyerChange}
+                name="address" 
+                value={buyerForm.address} 
+                onChange={handleBuyerChange} 
                    className="w-full border p-2 rounded"
-                   required
-                 />
-               </div>
+                required 
+              />
+            </div>
                <div>
                  <label className="block text-sm font-medium text-gray-700 mb-1">
                    Truck No
                  </label>
-                 <input
+              <input 
                    type="text"
                    name="truckNo"
                    value={buyerForm.truckNo}
@@ -332,25 +332,25 @@ function ClientsPage() {
                  />
                </div>
             </div>
-            <div className="flex gap-2 mt-4">
+          <div className="flex gap-2 mt-4">
               <button
                 type="submit"
                 className="bg-black text-white px-4 py-2 rounded"
               >
                 {isEditing ? 'Update Buyer' : 'Add Buyer'}
-              </button>
-              <button
-                type="button"
+            </button>
+            <button 
+              type="button" 
                 onClick={() => {
                   setShowForm(false);
                   clearForm();
                 }}
                 className="bg-gray-500 text-white px-4 py-2 rounded"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
         </div>
       )}
 
@@ -358,7 +358,7 @@ function ClientsPage() {
         <div className="p-6 border-b">
           <h3 className="text-lg font-semibold">Buyer List</h3>
         </div>
-        <div className="overflow-x-auto">
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
@@ -423,11 +423,11 @@ function ClientsPage() {
                         </button>
                       </div>
                     </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
         </div>
       </div>
     </div>
