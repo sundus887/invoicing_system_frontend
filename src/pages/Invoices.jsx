@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import api from '../services/api';
-import { generatePDFInvoice } from '../components/PDFInvoice'; // ✅ Fixed import
 
 function InvoicesPage() {
   const [invoices, setInvoices] = useState([]);
@@ -8,31 +7,33 @@ function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [exportLoading, setExportLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   
-  // PDF Modal states
-  const [showPDFModal, setShowPDFModal] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [selectedBuyerForPDF, setSelectedBuyerForPDF] = useState('default');
-  const [selectedSellerForPDF, setSelectedSellerForPDF] = useState('default');
+  // FBR Authentication State
+  const [fbrAuthStatus, setFbrAuthStatus] = useState(false);
   
+  // Form state for FBR-compliant invoice creation
   const [form, setForm] = useState({
-    invoiceNumber: "",
-    product: "",
-    units: "",
-    unitPrice: "",
-    totalValue: "",
-    salesTax: "",
-    extraTax: "",
-    finalValue: "",
-    date: new Date().toISOString().split('T')[0],
-    status: "pending",
     buyerId: "",
-    sellerId: "",
+    items: [{
+      description: "",
+      quantity: 1,
+      unitPrice: 0,
+      totalValue: 0,
+      salesTax: 0,
+      discount: 0
+    }],
+    totalAmount: 0,
+    salesTax: 0,
+    extraTax: 0,
+    discount: 0,
+    finalValue: 0,
+    issuedDate: new Date().toISOString().split('T')[0],
+    status: "pending"
   });
 
-  // Add state for buyers and sellers
+  // Buyers state
   const [buyers, setBuyers] = useState([]);
-  const [sellers, setSellers] = useState([]);
 
   // Fetch invoices from backend
   const fetchInvoices = async () => {
@@ -41,8 +42,6 @@ function InvoicesPage() {
       setError(null);
       const response = await api.get('/api/invoices');
       console.log('✅ Backend invoices response:', response.data);
-      console.log('   Number of invoices:', response.data.length);
-      console.log('📋 First invoice sample:', response.data[0]);
       setInvoices(response.data);
     } catch (err) {
       console.error('❌ Error fetching invoices:', err);
@@ -52,11 +51,10 @@ function InvoicesPage() {
     }
   };
 
-  // Fetch buyers (clients) from backend - FIXED ENDPOINT
+  // Fetch buyers (clients) from backend
   const fetchBuyers = async () => {
     try {
-      console.log('   Fetching buyers...');
-      const response = await api.get('/api/invoices/buyers/available');
+      const response = await api.get('/api/clients');
       console.log('✅ Buyers loaded:', response.data);
       setBuyers(response.data);
     } catch (err) {
@@ -65,81 +63,118 @@ function InvoicesPage() {
     }
   };
 
-  // Fetch sellers from backend - FIXED ENDPOINT
-  const fetchSellers = async () => {
+  // Check FBR authentication status
+  const checkFbrAuthStatus = async () => {
     try {
-      console.log('🔄 Fetching sellers...');
-      const response = await api.get('/api/invoices/sellers/available');
-      console.log('✅ Sellers loaded:', response.data);
-      setSellers(response.data);
+      const response = await api.get('/api/fbr-auth/status');
+      setFbrAuthStatus(response.data.isAuthenticated);
     } catch (err) {
-      console.error('❌ Error fetching sellers:', err);
-      setSellers([]);
+      console.error('❌ Error checking FBR auth status:', err);
+      setFbrAuthStatus(false);
     }
   };
 
-  // PDF Generation Function - NEW WITH BUYER/SELLER SELECTION
-  const handleGeneratePDF = async (invoice, selectedBuyerId = 'default', selectedSellerId = 'default') => {
+  // PDF Generation Function - Updated for FBR
+  const handleGeneratePDF = async (invoice) => {
     try {
-      console.log('   Generating PDF for invoice:', invoice._id);
-      console.log('🔍 Selected buyer ID:', selectedBuyerId);
-      console.log('   Selected seller ID:', selectedSellerId);
+      console.log('   Generating PDF for invoice:', invoice.invoiceNumber);
       
-      // Use the new backend endpoint with buyer/seller selection
-      const response = await api.get(`/api/invoices/${invoice._id}/pdf/${selectedBuyerId}/${selectedSellerId}`);
+      // Use the FBR-specific PDF endpoint
+      const response = await api.get(`/api/pdf/fbr-invoice/${invoice.invoiceNumber}`, {
+        responseType: 'blob'
+      });
       
-      const { invoice: invoiceData, buyer, seller } = response.data;
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `fbr-invoice-${invoice.invoiceNumber}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
       
-      console.log('✅ Received PDF data:', { invoiceData, buyer, seller });
-      
-      // Generate PDF with specific buyer/seller data
-      await generatePDFInvoice(invoiceData, buyer, seller);
-      console.log('✅ PDF generated successfully with selected buyer/seller');
-      
-      // Close modal after successful generation
-      setShowPDFModal(false);
-      
+      setSuccess('PDF downloaded successfully!');
     } catch (error) {
       console.error('❌ Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+      setError('Failed to generate PDF. Please try again.');
     }
   };
 
-  // Open PDF selection modal
-  const openPDFModal = (invoice) => {
-    setSelectedInvoice(invoice);
-    setSelectedBuyerForPDF(invoice.buyerId || 'default');
-    setSelectedSellerForPDF(invoice.sellerId || 'default');
-    setShowPDFModal(true);
+  // Add new item to invoice form
+  const addItem = () => {
+    setForm(prev => ({
+      ...prev,
+      items: [...prev.items, {
+        description: "",
+        quantity: 1,
+        unitPrice: 0,
+        totalValue: 0,
+        salesTax: 0,
+        discount: 0
+      }]
+    }));
   };
 
-  // Excel Export Function - Fixed API endpoint and blob handling
+  // Remove item from invoice form
+  const removeItem = (index) => {
+    setForm(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Update item in invoice form
+  const updateItem = (index, field, value) => {
+    setForm(prev => {
+      const updatedItems = [...prev.items];
+      updatedItems[index][field] = value;
+      
+      // Calculate totals for this item
+      if (field === 'quantity' || field === 'unitPrice') {
+        const quantity = parseFloat(updatedItems[index].quantity) || 0;
+        const unitPrice = parseFloat(updatedItems[index].unitPrice) || 0;
+        updatedItems[index].totalValue = quantity * unitPrice;
+        updatedItems[index].salesTax = updatedItems[index].totalValue * 0.18; // 18% tax
+      }
+      
+      // Calculate invoice totals
+      const totalAmount = updatedItems.reduce((sum, item) => sum + (item.totalValue || 0), 0);
+      const totalTax = updatedItems.reduce((sum, item) => sum + (item.salesTax || 0), 0);
+      const totalDiscount = updatedItems.reduce((sum, item) => sum + (item.discount || 0), 0);
+      
+      return {
+        ...prev,
+        items: updatedItems,
+        totalAmount,
+        salesTax: totalTax,
+        discount: totalDiscount,
+        finalValue: totalAmount + totalTax - totalDiscount
+      };
+    });
+  };
+
+  // Excel Export Function
   const handleExportExcel = async () => {
     try {
       setExportLoading(true);
       
-      // Client-side CSV export with proper encoding
-      console.log('🔄 Using client-side CSV export...');
-        
       const headers = [
         'Invoice #',
-        'Product',
-        'Units/Quantity',
-        'Unit Price Excluding GST',
-        'Total Value Excluding GST',
+        'Buyer',
+        'Items',
+        'Total Amount',
         'Sales Tax',
-        'Extra Tax',
-        'Value including GST & Extra Tax',
+        'Final Amount',
         'Date',
-        'Status'
+        'Status',
+        'FBR Status'
       ];
       
-      // Helper function to properly escape CSV values
       const escapeCSV = (value) => {
         if (value === null || value === undefined) return '';
         const stringValue = String(value).trim();
-        // If the value contains comma, quote, or newline, wrap it in quotes and escape internal quotes
-        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
+        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
           return '"' + stringValue.replace(/"/g, '""') + '"';
         }
         return stringValue;
@@ -148,36 +183,29 @@ function InvoicesPage() {
       const csvContent = [
         headers.map(escapeCSV).join(','),
         ...invoices.map(inv => {
-          // Use actual invoice data or calculate defaults
-          const unitPrice = parseFloat(inv.unitPrice) || 0;
-          const quantity = parseFloat(inv.units) || 1;
-          const totalValue = parseFloat(inv.totalValue) || (unitPrice * quantity);
-          const salesTax = parseFloat(inv.salesTax) || (totalValue * 0.18);
-          const extraTax = parseFloat(inv.extraTax) || 0;
-          const finalValue = parseFloat(inv.finalValue) || (totalValue + salesTax + extraTax);
+          const buyerName = inv.buyerId?.companyName || 'N/A';
+          const items = inv.items?.map(item => item.description || item.product).join('; ') || inv.product || 'N/A';
+          const fbrStatus = inv.fbrReference ? 'Submitted' : 'Not Submitted';
           
           const row = [
             inv.invoiceNumber || inv._id?.slice(-6) || 'N/A',
-            inv.product || inv.items?.[0]?.product || 'N/A',
-            quantity.toFixed(2),
-            unitPrice.toFixed(2),
-            totalValue.toFixed(2),
-            salesTax.toFixed(2),
-            extraTax.toFixed(2),
-            finalValue.toFixed(2),
+            buyerName,
+            items,
+            (inv.totalAmount || inv.totalValue || 0).toFixed(2),
+            (inv.salesTax || 0).toFixed(2),
+            (inv.finalValue || inv.finalAmount || 0).toFixed(2),
             inv.issuedDate ? new Date(inv.issuedDate).toLocaleDateString() : 'N/A',
-            inv.status || 'pending'
+            inv.status || 'pending',
+            fbrStatus
           ];
           
           return row.map(escapeCSV).join(',');
         })
-      ].join('\r\n'); // Use \r\n for better Excel compatibility on Windows
+      ].join('\r\n');
       
-      // Add BOM (Byte Order Mark) for better Excel compatibility
       const BOM = '\uFEFF';
       const csvContentWithBOM = BOM + csvContent;
       
-      // Create and download the CSV file with proper encoding
       const blob = new Blob([csvContentWithBOM], { 
         type: 'text/csv;charset=utf-8;' 
       });
@@ -192,10 +220,10 @@ function InvoicesPage() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      alert('Invoice data exported successfully as CSV!');
+      setSuccess('Invoice data exported successfully as CSV!');
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Failed to export invoice data. Please try again.');
+      setError('Failed to export invoice data. Please try again.');
     } finally {
       setExportLoading(false);
     }
@@ -204,103 +232,127 @@ function InvoicesPage() {
   useEffect(() => {
     fetchInvoices();
     fetchBuyers();
-    fetchSellers();
+    checkFbrAuthStatus();
   }, []);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    const newForm = { ...form, [name]: value };
-    
-    // Auto-calculate values based on unit price and quantity
-    if (name === 'unitPrice' || name === 'units') {
-      const unitPrice = parseFloat(name === 'unitPrice' ? value : form.unitPrice) || 0;
-      const units = parseFloat(name === 'units' ? value : form.units) || 0;
-      const totalValue = unitPrice * units;
-      const salesTax = totalValue * 0.18; // 18% GST
-      const extraTax = parseFloat(form.extraTax) || 0;
-      const finalValue = totalValue + salesTax + extraTax;
-      
-      newForm.totalValue = totalValue.toFixed(2);
-      newForm.salesTax = salesTax.toFixed(2);
-      newForm.finalValue = finalValue.toFixed(2);
-    }
-    
-    // Recalculate final value when extra tax changes
-    if (name === 'extraTax') {
-      const totalValue = parseFloat(form.totalValue) || 0;
-      const salesTax = parseFloat(form.salesTax) || 0;
-      const extraTax = parseFloat(value) || 0;
-      const finalValue = totalValue + salesTax + extraTax;
-      newForm.finalValue = finalValue.toFixed(2);
-    }
-    
-    setForm(newForm);
-  };
 
   const handleAddInvoice = async (e) => {
     e.preventDefault();
+    
+    if (!fbrAuthStatus) {
+      setError('Please authenticate with FBR first in Seller Settings');
+      return;
+    }
+
+    if (!form.buyerId) {
+      setError('Please select a buyer');
+      return;
+    }
+
+    if (form.items.length === 0 || !form.items[0].description) {
+      setError('Please add at least one item with description');
+      return;
+    }
+
     try {
-      console.log('   Submitting invoice with data:', form);
-      console.log('   Buyer ID:', form.buyerId);
-      console.log('📊 Seller ID:', form.sellerId);
+      console.log('📝 Submitting FBR invoice with data:', form);
       
-      // Validate buyer and seller selection
-      if (!form.buyerId) {
-        alert('Please select a buyer');
-        return;
+      // Create invoice
+      const invoiceData = {
+        buyerId: form.buyerId,
+        items: form.items,
+        totalAmount: form.totalAmount,
+        salesTax: form.salesTax,
+        extraTax: form.extraTax,
+        discount: form.discount,
+        finalValue: form.finalValue,
+        issuedDate: form.issuedDate,
+        status: form.status
+      };
+
+      const response = await api.post('/api/invoices', invoiceData);
+      console.log('✅ Invoice created successfully:', response.data);
+      
+      if (response.data.success) {
+        // Submit to FBR
+        const fbrResponse = await api.post('/api/fbrinvoices/create-from-invoice', {
+          invoiceNumber: response.data.invoice.invoiceNumber,
+          sandbox: true
+        });
+
+        if (fbrResponse.data.success) {
+          setSuccess('Invoice created and submitted to FBR successfully!');
+          setShowForm(false);
+          resetForm();
+          await fetchInvoices();
+        } else {
+          setError('Invoice created but FBR submission failed');
+        }
       }
-      if (!form.sellerId) {
-        alert('Please select a seller');
-        return;
-      }
-      
-      const response = await api.post('/api/invoices', form);
-      console.log('✅ Invoice added successfully:', response.data);
-      
-      setShowForm(false);
-      setForm({
-        invoiceNumber: "",
-        product: "",
-        units: "",
-        unitPrice: "",
-        totalValue: "",
-        salesTax: "",
-        extraTax: "",
-        finalValue: "",
-        date: new Date().toISOString().split('T')[0],
-        status: "pending",
-        buyerId: "",
-        sellerId: "",
-      });
-      await fetchInvoices();
     } catch (err) {
       console.error('❌ Error adding invoice:', err);
       setError('Failed to add invoice. Please try again.');
     }
   };
 
+  const resetForm = () => {
+    setForm({
+      buyerId: "",
+      items: [{
+        description: "",
+        quantity: 1,
+        unitPrice: 0,
+        totalValue: 0,
+        salesTax: 0,
+        discount: 0
+      }],
+      totalAmount: 0,
+      salesTax: 0,
+      extraTax: 0,
+      discount: 0,
+      finalValue: 0,
+      issuedDate: new Date().toISOString().split('T')[0],
+      status: "pending"
+    });
+  };
+
   if (loading) {
     return <div className="text-center py-8">Loading invoices...</div>;
   }
 
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <div className="text-red-600 mb-4">{error}</div>
-        <button 
-          onClick={fetchInvoices}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">Invoices</h2>
+    <div className="p-6">
+      {/* Success/Error Messages */}
+      {success && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          {success}
+        </div>
+      )}
+      
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+
+      {/* FBR Authentication Status */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">FBR Status</h3>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+            fbrAuthStatus ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+            {fbrAuthStatus ? 'Authenticated' : 'Not Authenticated'}
+          </span>
+        </div>
+        {!fbrAuthStatus && (
+          <p className="text-sm text-red-600 mt-2">
+            ⚠️ Please authenticate with FBR in Seller Settings before creating invoices
+          </p>
+        )}
+      </div>
+
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">FBR Invoices</h2>
         <div className="flex gap-2">
           <button 
             onClick={handleExportExcel}
@@ -320,189 +372,242 @@ function InvoicesPage() {
           </button>
 
           <button
-            className="bg-black text-white px-5 py-2 rounded-lg font-semibold flex items-center gap-2"
+            className="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold flex items-center gap-2 disabled:opacity-50"
             onClick={() => setShowForm(true)}
+            disabled={!fbrAuthStatus}
           >
-            <span className="text-xl">+</span> Add Invoice
+            <span className="text-xl">+</span> Create FBR Invoice
           </button>
         </div>
       </div>
       
+      {/* FBR Invoice Creation Form */}
       {showForm && (
-        <form
-          onSubmit={handleAddInvoice}
-          className="bg-white p-6 rounded-xl shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-4"
-        >
-          <input name="invoiceNumber" value={form.invoiceNumber} onChange={handleChange} placeholder="Invoice #" className="border p-2 rounded" required />
-          <input name="product" value={form.product} onChange={handleChange} placeholder="Product" className="border p-2 rounded" required />
-          <input name="units" type="number" value={form.units} onChange={handleChange} placeholder="Units/Quantity" className="border p-2 rounded" required />
-          <input name="unitPrice" type="number" step="0.01" value={form.unitPrice} onChange={handleChange} placeholder="Unit Price Excluding GST" className="border p-2 rounded" required />
-          <input name="totalValue" type="number" step="0.01" value={form.totalValue} onChange={handleChange} placeholder="Total Value Excluding GST" className="border p-2 rounded" required />
-          <input name="salesTax" type="number" step="0.01" value={form.salesTax} onChange={handleChange} placeholder="Sales Tax" className="border p-2 rounded" />
-          <input name="extraTax" type="number" step="0.01" value={form.extraTax} onChange={handleChange} placeholder="Extra Tax" className="border p-2 rounded" />
-          <input name="finalValue" type="number" step="0.01" value={form.finalValue} onChange={handleChange} placeholder="Value including GST & Extra Tax" className="border p-2 rounded" required />
-          <input name="date" type="date" value={form.date} onChange={handleChange} className="border p-2 rounded" required />
-          <select name="status" value={form.status} onChange={handleChange} className="border p-2 rounded" required>
-            <option value="">Select Status</option>
-            <option value="paid">Paid</option>
-            <option value="pending">Pending</option>
-            <option value="overdue">Overdue</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+        <div className="bg-white p-6 rounded-xl shadow mb-6">
+          <h3 className="text-lg font-semibold mb-4">Create FBR Invoice</h3>
           
-          {/* Buyer Selection */}
-          <select name="buyerId" value={form.buyerId} onChange={handleChange} className="border p-2 rounded" required>
-            <option value="">Select Buyer (Client)</option>
-            {buyers.map(buyer => (
-              <option key={buyer._id} value={buyer._id}>
-                {buyer.companyName} - {buyer.buyerSTRN}
-              </option>
-            ))}
-          </select>
-          
-          {/* Seller Selection */}
-          <select name="sellerId" value={form.sellerId} onChange={handleChange} className="border p-2 rounded" required>
-            <option value="">Select Seller</option>
-            {sellers.map(seller => (
-              <option key={seller._id} value={seller._id}>
-                {seller.companyName} - {seller.sellerNTN}
-              </option>
-            ))}
-          </select>
-          
-          <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded col-span-1 md:col-span-2">Add Invoice</button>
-          <button type="button" onClick={() => setShowForm(false)} className="col-span-1 md:col-span-2 text-gray-500 mt-2">Cancel</button>
-        </form>
-      )}
-      
-      {/* PDF Selection Modal */}
-      {showPDFModal && selectedInvoice && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-bold mb-4">Select Buyer & Seller for PDF</h3>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">Buyer:</label>
-              <select 
-                value={selectedBuyerForPDF} 
-                onChange={(e) => setSelectedBuyerForPDF(e.target.value)}
+          <form onSubmit={handleAddInvoice} className="space-y-6">
+            {/* Buyer Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Buyer *
+              </label>
+              <select
+                value={form.buyerId}
+                onChange={(e) => setForm(prev => ({ ...prev, buyerId: e.target.value }))}
                 className="w-full border p-2 rounded"
+                required
               >
-                <option value="default">Use Invoice Default</option>
+                <option value="">Select a buyer...</option>
                 {buyers.map(buyer => (
                   <option key={buyer._id} value={buyer._id}>
-                    {buyer.companyName} - {buyer.buyerSTRN}
+                    {buyer.companyName} - {buyer.buyerNTN}
                   </option>
                 ))}
               </select>
             </div>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">Seller:</label>
-              <select 
-                value={selectedSellerForPDF} 
-                onChange={(e) => setSelectedSellerForPDF(e.target.value)}
-                className="w-full border p-2 rounded"
-              >
-                <option value="default">Use Invoice Default</option>
-                {sellers.map(seller => (
-                  <option key={seller._id} value={seller._id}>
-                    {seller.companyName} - {seller.sellerNTN}
-                  </option>
-                ))}
-              </select>
+
+            {/* Invoice Items */}
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <label className="block text-sm font-medium text-gray-700">
+                  Invoice Items *
+                </label>
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                >
+                  + Add Item
+                </button>
+              </div>
+              
+              {form.items.map((item, index) => (
+                <div key={index} className="border rounded-md p-4 mb-4">
+                  <div className="grid grid-cols-6 gap-4">
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700">Description</label>
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => updateItem(index, 'description', e.target.value)}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Quantity</label>
+                      <input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                        min="1"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Unit Price</label>
+                      <input
+                        type="number"
+                        value={item.unitPrice}
+                        onChange={(e) => updateItem(index, 'unitPrice', e.target.value)}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                        min="0"
+                        step="0.01"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Total Value</label>
+                      <input
+                        type="number"
+                        value={item.totalValue}
+                        readOnly
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                      />
+                    </div>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(index)}
+                        className="mt-6 bg-red-600 text-white px-3 py-2 rounded"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            
+
+            {/* Invoice Summary */}
+            <div className="bg-gray-50 p-4 rounded-md">
+              <h4 className="font-medium mb-2">Invoice Summary</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Total Amount:</span>
+                  <span>₹{form.totalAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Sales Tax (18%):</span>
+                  <span>₹{form.salesTax.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Discount:</span>
+                  <span>₹{form.discount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-lg border-t pt-2">
+                  <span>Final Amount:</span>
+                  <span>₹{form.finalValue.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Form Actions */}
             <div className="flex gap-2">
               <button
-                onClick={() => handleGeneratePDF(selectedInvoice, selectedBuyerForPDF, selectedSellerForPDF)}
-                className="bg-blue-600 text-white px-4 py-2 rounded flex-1"
+                type="submit"
+                className="bg-green-600 text-white px-6 py-2 rounded"
               >
-                Generate PDF
+                Create & Submit to FBR
               </button>
               <button
-                onClick={() => setShowPDFModal(false)}
-                className="bg-gray-500 text-white px-4 py-2 rounded flex-1"
+                type="button"
+                onClick={() => {
+                  setShowForm(false);
+                  resetForm();
+                }}
+                className="bg-gray-500 text-white px-6 py-2 rounded"
               >
                 Cancel
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
       
-      <table className="min-w-full bg-white border">
-        <thead>
-          <tr>
-            <th className="py-2 px-4 border">Invoice #</th>
-            <th className="py-2 px-4 border">Product</th>
-            <th className="py-2 px-4 border">Units/Quantity</th>
-            <th className="py-2 px-4 border">Unit Price Excluding GST</th>
-            <th className="py-2 px-4 border">Total Value Excluding GST</th>
-            <th className="py-2 px-4 border">Sales Tax</th>
-            <th className="py-2 px-4 border">Extra Tax</th>
-            <th className="py-2 px-4 border">Value including GST & Extra Tax</th>
-            <th className="py-2 px-4 border">Date</th>
-            <th className="py-2 px-4 border">Status</th>
-            <th className="py-2 px-4 border">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {invoices.length === 0 ? (
+      {/* Invoices Table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="min-w-full">
+          <thead className="bg-gray-50">
             <tr>
-              <td colSpan="11" className="py-4 px-4 border text-center text-gray-500">
-                No invoices found. Add your first invoice!
-              </td>
+              <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Invoice #</th>
+              <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Buyer</th>
+              <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Items</th>
+              <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Total Amount</th>
+              <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Final Amount</th>
+              <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Date</th>
+              <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Status</th>
+              <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">FBR Status</th>
+              <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Actions</th>
             </tr>
-          ) : (
-            invoices.map((inv, idx) => {
-              console.log('📋 Rendering invoice:', inv); // ✅ Added debugging
-              
-              // Use actual invoice data or calculate defaults
-              const unitPrice = parseFloat(inv.unitPrice) || 0;
-              const quantity = parseFloat(inv.units) || 1;
-              const totalValue = parseFloat(inv.totalValue) || (unitPrice * quantity);
-              const salesTax = parseFloat(inv.salesTax) || (totalValue * 0.18); // 18% GST
-              const extraTax = parseFloat(inv.extraTax) || 0;
-              const finalValue = parseFloat(inv.finalValue) || (totalValue + salesTax + extraTax);
-              
-              return (
-                <tr key={inv._id || idx}>
-                  <td className="py-2 px-4 border">{inv.invoiceNumber || inv._id?.slice(-6) || `INV-${idx + 1}`}</td>
-                  <td className="py-2 px-4 border">{inv.product || inv.items?.[0]?.product || 'N/A'}</td>
-                  <td className="py-2 px-4 border">{quantity.toLocaleString()}</td>
-                  <td className="py-2 px-4 border">{unitPrice.toLocaleString()}</td>
-                  <td className="py-2 px-4 border">{totalValue.toLocaleString()}</td>
-                  <td className="py-2 px-4 border">{salesTax.toLocaleString()}</td>
-                  <td className="py-2 px-4 border">{extraTax.toLocaleString()}</td>
-                  <td className="py-2 px-4 border">{finalValue.toLocaleString()}</td>
-                  <td className="py-2 px-4 border">
-                    {inv.issuedDate ? new Date(inv.issuedDate).toLocaleDateString() : 'N/A'}
-                  </td>
-                  <td className="py-2 px-4 border">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      inv.status === 'paid' ? 'bg-green-100 text-green-800' :
-                      inv.status === 'overdue' ? 'bg-red-100 text-red-800' :
-                      inv.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {inv.status || 'pending'}
-                    </span>
-                  </td>
-                  <td className="py-2 px-4 border">
-                    <button
-                      onClick={() => openPDFModal(inv)}
-                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 flex items-center gap-1"
-                    >
-                      📄 Generate PDF
-                    </button>
-                  </td>
-                </tr>
-              );
-            })
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {invoices.length === 0 ? (
+              <tr>
+                <td colSpan="9" className="py-8 px-4 text-center text-gray-500">
+                  No invoices found. Create your first FBR invoice!
+                </td>
+              </tr>
+            ) : (
+              invoices.map((inv) => {
+                const buyerName = inv.buyerId?.companyName || 'N/A';
+                const items = inv.items?.map(item => item.description || item.product).join(', ') || inv.product || 'N/A';
+                const hasFbrData = inv.fbrReference || inv.uuid || inv.irn;
+                
+                return (
+                  <tr key={inv._id} className="hover:bg-gray-50">
+                    <td className="py-3 px-4 text-sm text-gray-900">
+                      {inv.invoiceNumber || inv._id?.slice(-6)}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-900">{buyerName}</td>
+                    <td className="py-3 px-4 text-sm text-gray-900">
+                      <div className="max-w-xs truncate" title={items}>
+                        {items}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-900">
+                      ₹{(inv.totalAmount || inv.totalValue || 0).toFixed(2)}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-900">
+                      ₹{(inv.finalValue || inv.finalAmount || 0).toFixed(2)}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-900">
+                      {inv.issuedDate ? new Date(inv.issuedDate).toLocaleDateString() : 'N/A'}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        inv.status === 'paid' ? 'bg-green-100 text-green-800' :
+                        inv.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                        inv.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {inv.status || 'pending'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        hasFbrData ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {hasFbrData ? 'Submitted' : 'Not Submitted'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <button
+                        onClick={() => handleGeneratePDF(inv)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 flex items-center gap-1"
+                      >
+                        📄 Download PDF
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
