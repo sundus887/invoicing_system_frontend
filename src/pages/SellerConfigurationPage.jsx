@@ -116,8 +116,8 @@ const SellerConfigurationPage = () => {
   };
 
   const handleEditConfiguration = () => {
-    console.log('Edit configuration clicked');
-    setIsEditing(true);
+    console.log('Edit configuration clicked - isEditing will be:', !isEditing);
+    setIsEditing(!isEditing); // Toggle the state
     setError(null);
     setSuccess(null);
   };
@@ -223,14 +223,16 @@ const SellerConfigurationPage = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Seller Configuration</h1>
-        {!isEditing && (
-          <button
-            onClick={handleEditConfiguration}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Edit Configuration
-          </button>
-        )}
+        <button
+          onClick={handleEditConfiguration}
+          className={`px-4 py-2 rounded text-white ${
+            isEditing 
+              ? 'bg-gray-600 hover:bg-gray-700' 
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+        >
+          {isEditing ? 'Cancel Edit' : 'Edit Configuration'}
+        </button>
       </div>
 
       {/* Error/Success Messages */}
@@ -516,4 +518,4 @@ const SellerConfigurationPage = () => {
   );
 };
 
-export default SellerConfigurationPage; 
+export default SellerConfigurationPage;

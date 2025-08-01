@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-// Use local backend for development
+// Use deployed backend for production, local for development
 const API_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://hsoftworks.vercel.app' 
+  ? 'https://hsoftworks.vercel.app'
   : 'http://localhost:5000';
 
 console.log('🚀 Using API URL:', API_URL);
@@ -40,4 +40,4 @@ api.interceptors.response.use(
   }
 );
 
-export default api;
+export default api; 
