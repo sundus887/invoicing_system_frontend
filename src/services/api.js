@@ -1,7 +1,9 @@
 import axios from 'axios';
 
-// Use local backend for testing
-const API_URL = 'http://localhost:5000';
+// Use local backend for development
+const API_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://hsoftworks.vercel.app' 
+  : 'http://localhost:5000';
 
 console.log('🚀 Using API URL:', API_URL);
 console.log('🌍 Environment:', process.env.NODE_ENV);
