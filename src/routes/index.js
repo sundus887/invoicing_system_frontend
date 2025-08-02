@@ -2,23 +2,24 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import ProtectedRoute, { AdminRoute, SellerRoute, BuyerRoute } from '../components/ProtectedRoute';
+import ProtectedRoute, { AdminRoute, SellerRoute } from '../components/ProtectedRoute';
+import Layout from '../components/Layout';
 
 // Import your page components with correct paths
-import LoginPage from '../pages/LoginPage'; // Make sure this path is correct
-import DashboardPage from '../pages/DashboardPage';
-import ServicesPage from '../pages/ServicesPage';
-import InvoicesPage from '../pages/InvoicesPage';
-import ClientsPage from '../pages/ClientsPage';
-import TasksPage from '../pages/TasksPage';
-import ExportPage from '../pages/ExportPage';
-import FbrEInvoicingPage from '../pages/FbrEInvoicingPage';
-import ProfilePage from '../pages/ProfilePage';
-import AdminPanel from '../pages/AdminPanel';
-import Navbar from '../components/Navbar';
+import Login from '../pages/Login'; // Fixed: Login.jsx exists
+import Dashboard from '../pages/Dashboard'; // Fixed: Dashboard.jsx exists
+import Services from '../pages/Services'; // Fixed: Services.jsx exists
+import Invoices from '../pages/Invoices'; // Fixed: Invoices.jsx exists
+import Clients from '../pages/Clients'; // Fixed: Clients.jsx exists
+import TasksPage from '../pages/TasksPage'; // Fixed: TasksPage.jsx exists
+import ExportPage from '../pages/ExportPage'; // Fixed: ExportPage.jsx exists
+import FbrEInvoicing from '../pages/FbrEInvoicing'; // Fixed: FbrEInvoicing.jsx exists
+import Settings from '../pages/Settings'; // Fixed: Settings.jsx exists
+import UserRoles from '../pages/UserRoles'; // Fixed: UserRoles.jsx exists
+import SellerConfigurationPage from '../pages/SellerConfigurationPage'; // Fixed: SellerConfigurationPage.jsx exists
 
 const AppRoutes = () => {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
 
   if (loading) {
     return (
@@ -32,87 +33,30 @@ const AppRoutes = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {user && <Navbar />}
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/login" element={<Login />} />
       
-      <main className="container mx-auto px-4 py-6">
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/login" element={<LoginPage />} />
-          
-          {/* Protected Routes */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <Navigate to="/dashboard" replace />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          } />
-          
-          {/* Seller Routes */}
-          <Route path="/services" element={
-            <SellerRoute>
-              <ServicesPage />
-            </SellerRoute>
-          } />
-          
-          <Route path="/invoices" element={
-            <SellerRoute>
-              <InvoicesPage />
-            </SellerRoute>
-          } />
-          
-          <Route path="/clients" element={
-            <SellerRoute>
-              <ClientsPage />
-            </SellerRoute>
-          } />
-          
-          <Route path="/tasks" element={
-            <SellerRoute>
-              <TasksPage />
-            </SellerRoute>
-          } />
-          
-          <Route path="/export" element={
-            <SellerRoute>
-              <ExportPage />
-            </SellerRoute>
-          } />
-          
-          <Route path="/fbr-einvoicing" element={
-            <SellerRoute>
-              <FbrEInvoicingPage />
-            </SellerRoute>
-          } />
-          
-          {/* Admin Routes */}
-          <Route path="/admin" element={
-            <AdminRoute>
-              <AdminPanel />
-            </AdminRoute>
-          } />
-          
-          {/* Buyer Routes */}
-          <Route path="/profile" element={
-            <BuyerRoute>
-              <ProfilePage />
-            </BuyerRoute>
-          } />
-          
-          {/* Catch-all route */}
-          <Route path="*" element={
-            <ProtectedRoute>
-              <Navigate to="/dashboard" replace />
-            </ProtectedRoute>
-          } />
-        </Routes>
-      </main>
-    </div>
+      {/* Protected Routes with Layout */}
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Layout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="services" element={<SellerRoute><Services /></SellerRoute>} />
+        <Route path="invoices" element={<SellerRoute><Invoices /></SellerRoute>} />
+        <Route path="clients" element={<SellerRoute><Clients /></SellerRoute>} />
+        <Route path="tasks" element={<SellerRoute><TasksPage /></SellerRoute>} />
+        <Route path="export" element={<SellerRoute><ExportPage /></SellerRoute>} />
+        <Route path="fbr-e-invoicing" element={<SellerRoute><FbrEInvoicing /></SellerRoute>} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="user-roles" element={<AdminRoute><UserRoles /></AdminRoute>} />
+        <Route path="sellers" element={<AdminRoute><SellerConfigurationPage /></AdminRoute>} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Route>
+    </Routes>
   );
 };
 
