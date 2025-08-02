@@ -226,6 +226,12 @@ const FbrEInvoicingPage = () => {
                     Buyer
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Items
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    HS Codes
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Amount
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -249,7 +255,17 @@ const FbrEInvoicingPage = () => {
                       {submission.buyerName}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {submission.finalAmount?.toFixed(2) || '0.00'}
+                      <div className="max-w-xs truncate" title={submission.itemsDescription}>
+                        {submission.itemsDescription || 'N/A'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                      <div className="max-w-xs truncate" title={submission.hsCodes}>
+                        {submission.hsCodes || '0000.00.00'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ₹{submission.finalAmount?.toFixed(2) || '0.00'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(submission.status)}`}>
@@ -291,6 +307,12 @@ const FbrEInvoicingPage = () => {
                   Buyer
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Items
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  HS Codes
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -316,7 +338,7 @@ const FbrEInvoicingPage = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {submissions.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan="11" className="px-6 py-4 text-center text-gray-500">
                     No FBR submissions found. Create invoices and submit them to FBR to see submissions here.
                   </td>
                 </tr>
@@ -330,7 +352,17 @@ const FbrEInvoicingPage = () => {
                       {submission.buyerName}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {submission.finalAmount?.toFixed(2) || '0.00'}
+                      <div className="max-w-xs truncate" title={submission.itemsDescription}>
+                        {submission.itemsDescription}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                      <div className="max-w-xs truncate" title={submission.hsCodes}>
+                        {submission.hsCodes}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ₹{submission.finalAmount?.toFixed(2) || '0.00'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(submission.status)}`}>
