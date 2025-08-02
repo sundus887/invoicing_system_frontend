@@ -82,50 +82,30 @@ function ExportPage() {
       let response;
       let filename;
 
-      switch (type) {
-        case 'csv':
-          response = await api.get('/api/export/csv', {
-            params: exportOptions
-          });
-          filename = `invoices-${new Date().toISOString().split('T')[0]}.csv`;
-          break;
-        
-        case 'excel':
-          response = await api.get('/api/export/excel', {
-            params: exportOptions
-          });
-          filename = `invoices-${new Date().toISOString().split('T')[0]}.xlsx`;
-          break;
-        
-        case 'pdf':
-          response = await api.get('/api/export/pdf', {
-            params: exportOptions
-          });
-          filename = `invoices-${new Date().toISOString().split('T')[0]}.pdf`;
-          break;
-        
-        default:
-          throw new Error('Invalid export type');
+      // Only CSV export is supported
+      if (type !== 'csv') {
+        setError(`${type.toUpperCase()} export is not available. Only CSV export is supported.`);
+        return;
       }
+
+      // Use the available export endpoint
+      response = await api.get('/api/export/excel', {
+        params: exportOptions
+      });
+      filename = `invoices-${new Date().toISOString().split('T')[0]}.csv`;
 
       // Handle file download
       if (response.data) {
-        // For CSV, create blob and download
-        if (type === 'csv') {
-          const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
-          const link = document.createElement('a');
-          const url = URL.createObjectURL(blob);
-          link.setAttribute('href', url);
-          link.setAttribute('download', filename);
-          link.style.visibility = 'hidden';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        } else {
-          // For Excel/PDF, open in new window
-          window.open(response.data.downloadUrl || response.data.url, '_blank');
-        }
+        const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
       }
 
       setSuccess(`${type.toUpperCase()} export completed successfully!`);
@@ -146,11 +126,8 @@ function ExportPage() {
 
       console.log('🔄 Starting bulk export...');
 
-      // Export all formats
-      await Promise.all([
-        handleExport('csv'),
-        handleExport('excel')
-      ]);
+      // Export CSV only (since other formats are not available)
+      await handleExport('csv');
 
       setSuccess('Bulk export completed successfully!');
     } catch (err) {
@@ -223,8 +200,6 @@ function ExportPage() {
               className="w-full border p-2 rounded"
             >
               <option value="csv">CSV (Comma Separated Values)</option>
-              <option value="excel">Excel (.xlsx)</option>
-              <option value="pdf">PDF Report</option>
             </select>
           </div>
 
@@ -321,7 +296,7 @@ function ExportPage() {
       </div>
 
       {/* Export Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <button
           onClick={() => handleExport('csv')}
           disabled={loading}
@@ -335,40 +310,6 @@ function ExportPage() {
           ) : (
             <>
               📊 Export CSV
-            </>
-          )}
-        </button>
-
-        <button
-          onClick={() => handleExport('excel')}
-          disabled={loading}
-          className="bg-blue-600 text-white p-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {loading ? (
-            <>
-              <span className="animate-spin">⏳</span>
-              Exporting...
-            </>
-          ) : (
-            <>
-              📈 Export Excel
-            </>
-          )}
-        </button>
-
-        <button
-          onClick={() => handleExport('pdf')}
-          disabled={loading}
-          className="bg-red-600 text-white p-4 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {loading ? (
-            <>
-              <span className="animate-spin">⏳</span>
-              Exporting...
-            </>
-          ) : (
-            <>
-              📄 Export PDF
             </>
           )}
         </button>
@@ -405,12 +346,11 @@ function ExportPage() {
       <div className="mt-8 bg-blue-50 p-4 rounded-lg">
         <h4 className="font-semibold text-blue-800 mb-2">ℹ️ Export Information</h4>
         <div className="text-sm text-blue-700 space-y-1">
-          <p><strong>CSV Export:</strong> Best for data analysis and spreadsheet applications</p>
-          <p><strong>Excel Export:</strong> Includes formatting and multiple sheets for comprehensive reports</p>
-          <p><strong>PDF Export:</strong> Professional reports suitable for printing and sharing</p>
+          <p><strong>CSV Export:</strong> Best for data analysis and spreadsheet applications. Compatible with Excel, Google Sheets, and other spreadsheet software.</p>
           <p><strong>HS Codes:</strong> Include Harmonized System codes for customs and tax compliance</p>
           <p><strong>FBR Data:</strong> Include Federal Board of Revenue submission information</p>
-          <p><strong>Bulk Export:</strong> Export multiple formats simultaneously for comprehensive backup</p>
+          <p><strong>Bulk Export:</strong> Export data in CSV format for comprehensive backup</p>
+          <p><strong>Note:</strong> Currently only CSV export is available. Excel and PDF exports will be added in future updates.</p>
         </div>
       </div>
     </div>
