@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
 function InvoicesPage() {
+  const { user, sellerId, isSeller, isAdmin } = useAuth();
+  
   const [invoices, setInvoices] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -39,7 +42,7 @@ function InvoicesPage() {
   // HS Code lookup functionality
   const lookupHSCode = async (productDescription) => {
     try {
-      const response = await api.get(`/api/hscodes/lookup?description=${encodeURIComponent(productDescription)}`);
+      const response = await api.get(`/hscodes/lookup?description=${encodeURIComponent(productDescription)}`);
       return response.data.hsCode;
     } catch (error) {
       console.error('Error looking up HS Code:', error);
@@ -65,28 +68,41 @@ function InvoicesPage() {
     }));
   };
 
-  // Fetch invoices from backend
+  // Fetch invoices from backend with seller context
   const fetchInvoices = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get('/api/invoices');
+      
+      // Check if user has permission to view invoices
+      if (!isSeller() && !isAdmin()) {
+        setError('You do not have permission to view invoices');
+        return;
+      }
+      
+      console.log('📋 Fetching invoices for seller:', sellerId);
+      const response = await api.get('/invoices');
       console.log('✅ Backend invoices response:', response.data);
-      setInvoices(response.data);
+      
+      // Backend now automatically filters by seller
+      setInvoices(response.data.invoices || response.data);
     } catch (err) {
       console.error('❌ Error fetching invoices:', err);
-      setError('Failed to load invoices. Please try again.');
+      setError(err.response?.data?.message || 'Failed to load invoices. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch buyers (clients) from backend
+  // Fetch buyers (clients) from backend with seller context
   const fetchBuyers = async () => {
     try {
-      const response = await api.get('/api/clients');
+      console.log('📋 Fetching buyers for seller:', sellerId);
+      const response = await api.get('/clients');
       console.log('✅ Buyers loaded:', response.data);
-      setBuyers(response.data);
+      
+      // Backend now automatically filters by seller
+      setBuyers(response.data.buyers || response.data);
     } catch (err) {
       console.error('❌ Error fetching buyers:', err);
       setBuyers([]);
@@ -96,7 +112,7 @@ function InvoicesPage() {
   // Check FBR authentication status
   const checkFbrAuthStatus = async () => {
     try {
-      const response = await api.get('/api/fbr-auth/status');
+      const response = await api.get('/fbr-auth/status');
       setFbrAuthStatus(response.data.isAuthenticated);
     } catch (err) {
       console.error('❌ Error checking FBR auth status:', err);
@@ -110,7 +126,7 @@ function InvoicesPage() {
       console.log('   Generating PDF for invoice:', invoice.invoiceNumber);
       
       // Use the FBR-specific PDF endpoint
-      const response = await api.get(`/api/pdf/fbr-invoice/${invoice.invoiceNumber}`, {
+      const response = await api.get(`/pdf/fbr-invoice/${invoice.invoiceNumber}`, {
         responseType: 'blob'
       });
       
@@ -264,13 +280,22 @@ function InvoicesPage() {
   };
 
   useEffect(() => {
-    fetchInvoices();
-    fetchBuyers();
-    checkFbrAuthStatus();
-  }, []);
+    // Only fetch data if user has permission
+    if (isSeller() || isAdmin()) {
+      fetchInvoices();
+      fetchBuyers();
+      checkFbrAuthStatus();
+    }
+  }, [sellerId, isSeller, isAdmin]);
 
   const handleAddInvoice = async (e) => {
     e.preventDefault();
+    
+    // Check permissions
+    if (!isSeller() && !isAdmin()) {
+      setError('Only sellers can create invoices');
+      return;
+    }
     
     if (!fbrAuthStatus) {
       setError('Please authenticate with FBR first in Seller Settings');
@@ -288,9 +313,9 @@ function InvoicesPage() {
     }
 
     try {
-      console.log('📝 Submitting FBR invoice with data:', form);
+      console.log('   Submitting invoice with seller context:', sellerId);
       
-      // Create invoice with HS Codes
+      // Create invoice with HS Codes - sellerId automatically assigned by backend
       const invoiceData = {
         buyerId: form.buyerId,
         items: form.items.map(item => ({
@@ -307,12 +332,12 @@ function InvoicesPage() {
         status: form.status
       };
 
-      const response = await api.post('/api/invoices', invoiceData);
+      const response = await api.post('/invoices', invoiceData);
       console.log('✅ Invoice created successfully:', response.data);
       
       if (response.data.success) {
         // Submit to FBR
-        const fbrResponse = await api.post('/api/fbrinvoices/create-from-invoice', {
+        const fbrResponse = await api.post('/fbrinvoices/create-from-invoice', {
           invoiceNumber: response.data.invoice.invoiceNumber,
           sandbox: true
         });
@@ -328,7 +353,7 @@ function InvoicesPage() {
       }
     } catch (err) {
       console.error('❌ Error adding invoice:', err);
-      setError('Failed to add invoice. Please try again.');
+      setError(err.response?.data?.error || 'Failed to add invoice. Please try again.');
     }
   };
 
@@ -354,8 +379,20 @@ function InvoicesPage() {
     });
   };
 
+  // Show loading state
   if (loading) {
     return <div className="text-center py-8">Loading invoices...</div>;
+  }
+
+  // Show permission error
+  if (!isSeller() && !isAdmin()) {
+    return (
+      <div className="text-center py-8">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          You do not have permission to view invoices. Only sellers and admins can access this page.
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -372,6 +409,29 @@ function InvoicesPage() {
           {error}
         </div>
       )}
+
+      {/* Seller Context Information */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-blue-800">Seller Context</h3>
+            <p className="text-sm text-blue-600">
+              Logged in as: <strong>{user?.name}</strong> ({user?.role})
+            </p>
+            <p className="text-sm text-blue-600">
+              Seller ID: <code className="bg-blue-100 px-1 rounded">{sellerId || 'Not set'}</code>
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-blue-600">
+              Total Invoices: <strong>{invoices.length}</strong>
+            </p>
+            <p className="text-sm text-blue-600">
+              Total Buyers: <strong>{buyers.length}</strong>
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* FBR Authentication Status */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
