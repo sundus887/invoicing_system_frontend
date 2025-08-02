@@ -249,7 +249,7 @@ const FbrEInvoicingPage = () => {
                       {submission.buyerName}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ₹{submission.finalAmount?.toFixed(2) || '0.00'}
+                      {submission.finalAmount?.toFixed(2) || '0.00'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(submission.status)}`}>
@@ -330,7 +330,7 @@ const FbrEInvoicingPage = () => {
                       {submission.buyerName}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ₹{submission.finalAmount?.toFixed(2) || '0.00'}
+                      {submission.finalAmount?.toFixed(2) || '0.00'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(submission.status)}`}>
