@@ -200,7 +200,7 @@ function DashboardPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">InvoSync Dashboard</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Tax Nexus Dashboard</h1>
       
       {/* Debug Info - Remove this section after fixing */}
       {process.env.NODE_ENV === 'development' && (

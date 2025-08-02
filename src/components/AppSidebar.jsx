@@ -12,7 +12,7 @@ const AppSidebar = () => {
           <span className="text-white font-bold text-sm">IS</span>
         </div>
         <div>
-          <h1 className="font-bold text-lg">InvoSync</h1>
+          <h1 className="font-bold text-lg">Tax Nexus</h1>
           <p className="text-xs text-gray-500">Invoice Management</p>
         </div>
       </div>

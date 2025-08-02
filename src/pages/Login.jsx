@@ -61,7 +61,7 @@ const Login = () => {
               </div>
             </div>
             <h2 className="text-3xl font-extrabold text-gray-900">
-              InvoSync
+              Tax Nexus
             </h2>
             <p className="text-gray-600 mt-2">Professional Invoice Management</p>
           </div>
