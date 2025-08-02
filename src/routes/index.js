@@ -4,8 +4,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ProtectedRoute, { AdminRoute, SellerRoute, BuyerRoute } from '../components/ProtectedRoute';
 
-// Import your page components
-import LoginPage from '../pages/LoginPage';
+// Import your page components with correct paths
+import LoginPage from '../pages/LoginPage'; // Make sure this path is correct
 import DashboardPage from '../pages/DashboardPage';
 import ServicesPage from '../pages/ServicesPage';
 import InvoicesPage from '../pages/InvoicesPage';
@@ -20,7 +20,6 @@ import Navbar from '../components/Navbar';
 const AppRoutes = () => {
   const { user, loading } = useAuth();
 
-  // Show loading while authentication is being checked
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -34,7 +33,6 @@ const AppRoutes = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Show Navbar only if user is authenticated */}
       {user && <Navbar />}
       
       <main className="container mx-auto px-4 py-6">

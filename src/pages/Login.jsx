@@ -1,9 +1,9 @@
+// src/pages/LoginPage.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { loginWithEmail } from "../services/auth";
 
-const Login = () => {
+const LoginPage = () => {
   const { login, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,7 +29,6 @@ const Login = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
-    // Clear error when user starts typing
     if (error) {
       setError("");
     }
@@ -40,7 +39,6 @@ const Login = () => {
     setLoading(true);
     setError("");
 
-    // Validate form data
     if (!formData.email || !formData.password) {
       setError("Please enter both email and password");
       setLoading(false);
@@ -50,7 +48,6 @@ const Login = () => {
     try {
       console.log('🔐 Attempting login for:', formData.email);
       
-      // Use the auth context login function
       const result = await login({
         email: formData.email,
         password: formData.password
@@ -58,14 +55,7 @@ const Login = () => {
 
       if (result.success) {
         console.log('✅ Login successful for:', result.user?.name);
-        
-        // Get the intended destination or default to dashboard
         const from = location.state?.from?.pathname || "/dashboard";
-        
-        // Show success message briefly before redirect
-        setError(""); // Clear any previous errors
-        
-        // Redirect to intended page
         navigate(from, { replace: true });
       } else {
         setError(result.error || "Login failed. Please check your credentials.");
@@ -73,13 +63,10 @@ const Login = () => {
     } catch (err) {
       console.error('❌ Login error:', err);
       
-      // Handle specific error types
       if (err.response?.status === 401) {
         setError("Invalid email or password. Please try again.");
       } else if (err.response?.status === 403) {
         setError("Account is disabled. Please contact your administrator.");
-      } else if (err.response?.status === 404) {
-        setError("User not found. Please check your email address.");
       } else if (err.message?.includes('Network Error')) {
         setError("Connection failed. Please check your internet connection.");
       } else {
@@ -90,45 +77,11 @@ const Login = () => {
     }
   };
 
-  const handleDemoLogin = async (role = 'seller') => {
-    setLoading(true);
-    setError("");
-
-    try {
-      console.log('🔐 Attempting demo login for role:', role);
-      
-      // Demo credentials based on role
-      const demoCredentials = {
-        admin: { email: 'admin@taxnexus.com', password: 'admin123' },
-        seller: { email: 'seller@taxnexus.com', password: 'seller123' },
-        buyer: { email: 'buyer@taxnexus.com', password: 'buyer123' }
-      };
-
-      const credentials = demoCredentials[role];
-      
-      const result = await login(credentials);
-
-      if (result.success) {
-        console.log('✅ Demo login successful for:', result.user?.name);
-        navigate("/dashboard", { replace: true });
-      } else {
-        setError("Demo login failed. Please try again.");
-      }
-    } catch (err) {
-      console.error('❌ Demo login error:', err);
-      setError("Demo login failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          {/* Logo positioned above app name */}
           <div className="flex flex-col items-center">
-            {/* Logo */}
             <div className="mb-6">
               <img 
                 src="/tax-nexus-logo-color-full-lg.jpg" 
@@ -209,7 +162,7 @@ const Login = () => {
             </div>
           )}
 
-          <div className="space-y-3">
+          <div>
             <button
               type="submit"
               disabled={loading}
@@ -227,41 +180,9 @@ const Login = () => {
                 "Sign in"
               )}
             </button>
-
-            {/* Demo Login Buttons */}
-            <div className="text-center">
-              <p className="text-sm text-gray-500 mb-3">Or try demo accounts:</p>
-              <div className="flex gap-2 justify-center">
-                <button
-                  type="button"
-                  onClick={() => handleDemoLogin('admin')}
-                  disabled={loading}
-                  className="px-3 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50"
-                >
-                  Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDemoLogin('seller')}
-                  disabled={loading}
-                  className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50"
-                >
-                  Seller
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDemoLogin('buyer')}
-                  disabled={loading}
-                  className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
-                >
-                  Buyer
-                </button>
-              </div>
-            </div>
           </div>
         </form>
 
-        {/* Information Panel */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h3 className="text-sm font-medium text-blue-800 mb-2">ℹ Multi-Tenant Platform</h3>
           <div className="text-xs text-blue-700 space-y-1">
@@ -276,4 +197,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default LoginPage;
