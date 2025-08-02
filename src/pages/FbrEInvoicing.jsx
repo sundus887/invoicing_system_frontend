@@ -89,6 +89,14 @@ const FbrEInvoicingPage = () => {
     }
   };
 
+  // Calculate success rate percentage
+  const calculateSuccessRate = () => {
+    if (!summary?.statusBreakdown) return 0;
+    const total = Object.values(summary.statusBreakdown).reduce((sum, count) => sum + count, 0);
+    const successful = summary.statusBreakdown.submitted || 0;
+    return total > 0 ? Math.round((successful / total) * 100) : 0;
+  };
+
   if (loading) {
     return (
       <div className="p-6">
@@ -179,7 +187,7 @@ const FbrEInvoicingPage = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Success Rate</p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  {summary.statusBreakdown?.submitted || 0}%
+                  {calculateSuccessRate()}%
                 </p>
               </div>
             </div>
@@ -372,6 +380,19 @@ const FbrEInvoicingPage = () => {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* FBR Compliance Information */}
+      <div className="mt-8 bg-blue-50 p-4 rounded-lg">
+        <h4 className="font-semibold text-blue-800 mb-2">ℹ FBR E-Invoicing Information</h4>
+        <div className="text-sm text-blue-700 space-y-1">
+          <p><strong>HS Code Compliance:</strong> All invoices include HS Codes for FBR compliance</p>
+          <p><strong>Poultry Products:</strong> Special HS codes (2309.00.00 for meal, 1511.00.00 for oil)</p>
+          <p><strong>UUID & IRN:</strong> Unique identifiers provided by FBR for each submission</p>
+          <p><strong>QR Code:</strong> Generated for each successful FBR submission</p>
+          <p><strong>Environment:</strong> Sandbox for testing, Production for live submissions</p>
+          <p><strong>PDF Generation:</strong> FBR-compliant PDFs with HS Codes and FBR references</p>
         </div>
       </div>
     </div>

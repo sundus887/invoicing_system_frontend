@@ -35,6 +35,7 @@ function ServicesPage() {
     "Import/Export Services",
     "Manufacturing Services",
     "Trading Services",
+    "Poultry Services", // Add poultry category
     "Other"
   ];
 
@@ -49,6 +50,7 @@ function ServicesPage() {
     "Advisory",
     "Processing",
     "Training",
+    "Product Supply", // Add product supply type
     "Other"
   ];
 
@@ -70,7 +72,7 @@ function ServicesPage() {
     }
   };
 
-  // HS Code lookup function
+  // HS Code lookup function - Updated to use correct endpoint
   const lookupHSCode = async (description) => {
     if (!description || description.length < 2) {
       setHsCodeSuggestions([]);
@@ -79,10 +81,21 @@ function ServicesPage() {
     }
     
     try {
-      const response = await api.get(`/api/hscodes/lookup?description=${encodeURIComponent(description)}`);
-      if (response.data.success) {
-        setHsCodeSuggestions(response.data.suggestions || []);
+      // Use the correct endpoint from your backend
+      const response = await api.get(`/api/hscodes/suggestions?description=${encodeURIComponent(description)}&limit=5`);
+      if (response.data && response.data.suggestions) {
+        setHsCodeSuggestions(response.data.suggestions);
         setShowHsCodeSuggestions(true);
+      } else {
+        // Fallback to direct lookup
+        const lookupResponse = await api.get(`/api/hscodes/lookup?description=${encodeURIComponent(description)}`);
+        if (lookupResponse.data && lookupResponse.data.hsCode) {
+          setHsCodeSuggestions([{
+            description: description,
+            hsCode: lookupResponse.data.hsCode
+          }]);
+          setShowHsCodeSuggestions(true);
+        }
       }
     } catch (err) {
       console.error('❌ Error looking up HS code:', err);
@@ -97,20 +110,50 @@ function ServicesPage() {
     setHsCodeSuggestions([]);
   };
 
+  // Auto-assign HS Code when description changes
+  const handleDescriptionChange = async (value) => {
+    setForm(prev => ({ ...prev, description: value }));
+
+    // Auto-assign HS Code if it's a product
+    if (form.isProduct && value.trim()) {
+      try {
+        const response = await api.get(`/api/hscodes/lookup?description=${encodeURIComponent(value)}`);
+        if (response.data && response.data.hsCode) {
+          setForm(prev => ({ ...prev, hsCode: response.data.hsCode }));
+          console.log(`🔍 Auto-assigned HS Code for "${value}": ${response.data.hsCode}`);
+        }
+      } catch (err) {
+        console.error('❌ Error auto-assigning HS code:', err);
+      }
+    }
+
+    // Show suggestions
+    if (form.isProduct) {
+      lookupHSCode(value);
+    }
+  };
+
   useEffect(() => {
     fetchServices();
   }, []); // Empty dependency array - only run once
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    
+    if (name === 'description') {
+      handleDescriptionChange(value);
+    } else {
+      setForm(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }));
+    }
 
-    // HS Code lookup when description changes
-    if (name === 'description' && form.isProduct) {
-      lookupHSCode(value);
+    // Clear HS Code if product checkbox is unchecked
+    if (name === 'isProduct' && !checked) {
+      setForm(prev => ({ ...prev, hsCode: '' }));
+      setShowHsCodeSuggestions(false);
+      setHsCodeSuggestions([]);
     }
   };
 
@@ -126,7 +169,14 @@ function ServicesPage() {
         return;
       }
 
-      await api.post('/api/services', form);
+      // Prepare service data with HS Code
+      const serviceData = {
+        ...form,
+        hsCode: form.isProduct ? (form.hsCode || '9983.99.00') : '', // Only include HS Code for products
+        price: form.price ? parseFloat(form.price) : 0
+      };
+
+      await api.post('/api/services', serviceData);
       console.log('✅ Service added successfully');
       setShowForm(false);
       setForm({
@@ -140,6 +190,8 @@ function ServicesPage() {
         category: "",
         isProduct: false,
       });
+      setHsCodeSuggestions([]);
+      setShowHsCodeSuggestions(false);
       await fetchServices(); // Refresh the list
     } catch (err) {
       console.error('❌ Error adding service:', err);
@@ -320,6 +372,11 @@ function ServicesPage() {
                   className="border p-2 rounded w-full font-mono text-sm bg-gray-50" 
                   readOnly
                 />
+                {form.hsCode && (
+                  <div className="text-green-600 text-xs mt-1">
+                    ✅ Auto-assigned HS Code: {form.hsCode}
+                  </div>
+                )}
                 {/* HS Code Suggestions */}
                 {showHsCodeSuggestions && hsCodeSuggestions.length > 0 && (
                   <div className="absolute z-10 bg-white border border-gray-300 rounded shadow-lg max-h-40 overflow-y-auto w-full mt-1">
@@ -338,6 +395,8 @@ function ServicesPage() {
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 💡 HS codes are automatically assigned based on the service description when it involves physical products.
+                <br />
+                🐔 For poultry services, HS codes like 2309.00.00 (poultry meal) and 1511.00.00 (poultry oil) will be assigned.
               </p>
             </div>
           )}
@@ -423,7 +482,11 @@ function ServicesPage() {
                   </td>
                   <td className="py-2 px-4 border">{service.duration || '-'}</td>
                   <td className="py-2 px-4 border font-mono text-xs">
-                    {service.hsCode || '-'}
+                    {service.hsCode ? (
+                      <span className="text-green-600" title="HS Code assigned">
+                        {service.hsCode} ✅
+                      </span>
+                    ) : '-'}
                   </td>
                   <td className="py-2 px-4 border">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -443,11 +506,12 @@ function ServicesPage() {
 
       {/* Information Panel */}
       <div className="mt-8 bg-blue-50 p-4 rounded-lg">
-        <h4 className="font-semibold text-blue-800 mb-2">ℹ️ Service Management Information</h4>
+        <h4 className="font-semibold text-blue-800 mb-2">ℹ Service Management Information</h4>
         <div className="text-sm text-blue-700 space-y-1">
-          <p><strong>Categories:</strong> Organize services by business area (Tax, Accounting, etc.)</p>
-          <p><strong>Types:</strong> Classify services by nature (Consultation, Documentation, etc.)</p>
+          <p><strong>Categories:</strong> Organize services by business area (Tax, Accounting, Poultry, etc.)</p>
+          <p><strong>Types:</strong> Classify services by nature (Consultation, Documentation, Product Supply, etc.)</p>
           <p><strong>HS Codes:</strong> Automatically assigned for services involving physical products</p>
+          <p><strong>Poultry Services:</strong> Special HS codes (2309.00.00 for meal, 1511.00.00 for oil)</p>
           <p><strong>Status:</strong> Track active, inactive, or discontinued services</p>
           <p><strong>Integration:</strong> Services can be linked to invoices for FBR compliance</p>
         </div>

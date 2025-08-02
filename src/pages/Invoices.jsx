@@ -12,7 +12,7 @@ function InvoicesPage() {
   // FBR Authentication State
   const [fbrAuthStatus, setFbrAuthStatus] = useState(false);
   
-  // Form state for FBR-compliant invoice creation
+  // Form state for FBR-compliant invoice creation with HS Codes
   const [form, setForm] = useState({
     buyerId: "",
     items: [{
@@ -21,7 +21,8 @@ function InvoicesPage() {
       unitPrice: 0,
       totalValue: 0,
       salesTax: 0,
-      discount: 0
+      discount: 0,
+      hsCode: "", // Add HS Code field
     }],
     totalAmount: 0,
     salesTax: 0,
@@ -34,6 +35,35 @@ function InvoicesPage() {
 
   // Buyers state
   const [buyers, setBuyers] = useState([]);
+
+  // HS Code lookup functionality
+  const lookupHSCode = async (productDescription) => {
+    try {
+      const response = await api.get(`/api/hscodes/lookup?description=${encodeURIComponent(productDescription)}`);
+      return response.data.hsCode;
+    } catch (error) {
+      console.error('Error looking up HS Code:', error);
+      return '9983.99.00'; // Default fallback
+    }
+  };
+
+  // Auto-assign HS Code when product description changes
+  const handleItemDescriptionChange = async (index, value) => {
+    const newItems = [...form.items];
+    newItems[index].description = value;
+    
+    // Auto-assign HS Code
+    if (value.trim()) {
+      const hsCode = await lookupHSCode(value);
+      newItems[index].hsCode = hsCode;
+      console.log(`🔍 Auto-assigned HS Code for "${value}": ${hsCode}`);
+    }
+    
+    setForm(prev => ({
+      ...prev,
+      items: newItems
+    }));
+  };
 
   // Fetch invoices from backend
   const fetchInvoices = async () => {
@@ -111,7 +141,8 @@ function InvoicesPage() {
         unitPrice: 0,
         totalValue: 0,
         salesTax: 0,
-        discount: 0
+        discount: 0,
+        hsCode: "", // Add HS Code field
       }]
     }));
   };
@@ -163,6 +194,7 @@ function InvoicesPage() {
         'Invoice #',
         'Buyer',
         'Items',
+        'HS Codes', // Add HS Codes column
         'Total Amount',
         'Sales Tax',
         'Final Amount',
@@ -185,12 +217,14 @@ function InvoicesPage() {
         ...invoices.map(inv => {
           const buyerName = inv.buyerId?.companyName || 'N/A';
           const items = inv.items?.map(item => item.description || item.product).join('; ') || inv.product || 'N/A';
+          const hsCodes = inv.items?.map(item => item.hsCode || '0000.00.00').join('; ') || '0000.00.00'; // Add HS Codes
           const fbrStatus = inv.fbrReference ? 'Submitted' : 'Not Submitted';
           
           const row = [
             inv.invoiceNumber || inv._id?.slice(-6) || 'N/A',
             buyerName,
             items,
+            hsCodes, // Add HS Codes to export
             (inv.totalAmount || inv.totalValue || 0).toFixed(2),
             (inv.salesTax || 0).toFixed(2),
             (inv.finalValue || inv.finalAmount || 0).toFixed(2),
@@ -256,10 +290,14 @@ function InvoicesPage() {
     try {
       console.log('📝 Submitting FBR invoice with data:', form);
       
-      // Create invoice
+      // Create invoice with HS Codes
       const invoiceData = {
         buyerId: form.buyerId,
-        items: form.items,
+        items: form.items.map(item => ({
+          ...item,
+          hsCode: item.hsCode || '9983.99.00', // Ensure HS Code is included
+          product: item.description, // Map description to product for backend
+        })),
         totalAmount: form.totalAmount,
         salesTax: form.salesTax,
         extraTax: form.extraTax,
@@ -303,7 +341,8 @@ function InvoicesPage() {
         unitPrice: 0,
         totalValue: 0,
         salesTax: 0,
-        discount: 0
+        discount: 0,
+        hsCode: "", // Reset HS Code field
       }],
       totalAmount: 0,
       salesTax: 0,
@@ -346,7 +385,7 @@ function InvoicesPage() {
         </div>
         {!fbrAuthStatus && (
           <p className="text-sm text-red-600 mt-2">
-            ⚠️ Please authenticate with FBR in Seller Settings before creating invoices
+            ⚠ Please authenticate with FBR in Seller Settings before creating invoices
           </p>
         )}
       </div>
@@ -424,16 +463,33 @@ function InvoicesPage() {
               
               {form.items.map((item, index) => (
                 <div key={index} className="border rounded-md p-4 mb-4">
-                  <div className="grid grid-cols-6 gap-4">
+                  <div className="grid grid-cols-7 gap-4">
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700">Description</label>
                       <input
                         type="text"
                         value={item.description}
-                        onChange={(e) => updateItem(index, 'description', e.target.value)}
+                        onChange={(e) => handleItemDescriptionChange(index, e.target.value)}
                         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                        placeholder="Enter product/service description"
                         required
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">HS Code</label>
+                      <input
+                        type="text"
+                        value={item.hsCode}
+                        onChange={(e) => updateItem(index, 'hsCode', e.target.value)}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                        placeholder="Auto-assigned"
+                        readOnly={!!item.hsCode}
+                      />
+                      {item.hsCode && (
+                        <small className="text-green-600 text-xs">
+                          ✅ Auto-assigned
+                        </small>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Quantity</label>
@@ -535,6 +591,7 @@ function InvoicesPage() {
               <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Invoice #</th>
               <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Buyer</th>
               <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Items</th>
+              <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">HS Codes</th>
               <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Total Amount</th>
               <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Final Amount</th>
               <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Date</th>
@@ -546,7 +603,7 @@ function InvoicesPage() {
           <tbody className="divide-y divide-gray-200">
             {invoices.length === 0 ? (
               <tr>
-                <td colSpan="9" className="py-8 px-4 text-center text-gray-500">
+                <td colSpan="10" className="py-8 px-4 text-center text-gray-500">
                   No invoices found. Create your first FBR invoice!
                 </td>
               </tr>
@@ -554,6 +611,7 @@ function InvoicesPage() {
               invoices.map((inv) => {
                 const buyerName = inv.buyerId?.companyName || 'N/A';
                 const items = inv.items?.map(item => item.description || item.product).join(', ') || inv.product || 'N/A';
+                const hsCodes = inv.items?.map(item => item.hsCode || '0000.00.00').join(', ') || '0000.00.00';
                 const hasFbrData = inv.fbrReference || inv.uuid || inv.irn;
                 
                 return (
@@ -565,6 +623,11 @@ function InvoicesPage() {
                     <td className="py-3 px-4 text-sm text-gray-900">
                       <div className="max-w-xs truncate" title={items}>
                         {items}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-900">
+                      <div className="max-w-xs truncate" title={hsCodes}>
+                        {hsCodes}
                       </div>
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-900">
