@@ -487,19 +487,19 @@ function InvoicesPage() {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span>Total Amount:</span>
-                  <span>₹{form.totalAmount.toFixed(2)}</span>
+                  <span>{form.totalAmount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Sales Tax (18%):</span>
-                  <span>₹{form.salesTax.toFixed(2)}</span>
+                  <span>{form.salesTax.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Discount:</span>
-                  <span>₹{form.discount.toFixed(2)}</span>
+                  <span>{form.discount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-lg border-t pt-2">
                   <span>Final Amount:</span>
-                  <span>₹{form.finalValue.toFixed(2)}</span>
+                  <span>{form.finalValue.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -568,10 +568,10 @@ function InvoicesPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-900">
-                      ₹{(inv.totalAmount || inv.totalValue || 0).toFixed(2)}
+                      {(inv.totalAmount || inv.totalValue || 0).toFixed(2)}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-900">
-                      ₹{(inv.finalValue || inv.finalAmount || 0).toFixed(2)}
+                      {(inv.finalValue || inv.finalAmount || 0).toFixed(2)}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-900">
                       {inv.issuedDate ? new Date(inv.issuedDate).toLocaleDateString() : 'N/A'}
