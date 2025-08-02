@@ -54,12 +54,14 @@ const Login = () => {
         <div>
           {/* Logo positioned above app name */}
           <div className="flex flex-col items-center">
-            {/* Logo */}
-            <div className="mb-6">
-              <div className="w-16 h-16 bg-black rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-2xl">IS</span>
-              </div>
-            </div>
+                         {/* Logo */}
+             <div className="mb-6">
+               <img 
+                 src="/tax-nexus-logo-color-full-lg.jpg" 
+                 alt="Tax Nexus Logo" 
+                 className="w-16 h-16 object-cover rounded-lg"
+               />
+             </div>
             <h2 className="text-3xl font-extrabold text-gray-900">
               Tax Nexus
             </h2>
