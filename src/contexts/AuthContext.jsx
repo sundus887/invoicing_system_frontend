@@ -1,6 +1,6 @@
 // src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { isAuthenticated, getCurrentUser, logout as authLogout } from '../services/auth';
+import { isAuthenticated, getCurrentUser, logout as authLogout, loginWithEmail } from '../services/auth';
 
 const AuthContext = createContext();
 
@@ -24,8 +24,8 @@ export const AuthProvider = ({ children }) => {
           const currentUser = getCurrentUser();
           setUser(currentUser);
           
-          // Set seller ID if user is a seller
-          if (currentUser && currentUser.role === 'seller' && currentUser.sellerId) {
+          // Set seller ID if user is a seller or admin
+          if (currentUser && currentUser.sellerId) {
             setSellerId(currentUser.sellerId);
           }
         }
@@ -41,22 +41,30 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
-      // This would typically call your auth service
-      // For now, we'll simulate a login
-      const mockUser = {
-        id: 1,
-        name: 'Test User',
-        email: credentials.email,
-        role: 'seller',
-        sellerId: 'seller-123'
-      };
+      console.log('🔐 AuthContext: Attempting login for:', credentials.email);
       
-      setUser(mockUser);
-      setSellerId(mockUser.sellerId);
+      // Use the actual auth service
+      const success = loginWithEmail(credentials.email, credentials.password);
+      console.log('🔐 AuthContext: Login success:', success);
       
-      return { success: true, user: mockUser };
+      if (success) {
+        const user = getCurrentUser();
+        console.log('🔐 AuthContext: Retrieved user:', user);
+        setUser(user);
+        
+        // Set seller ID if user is a seller or admin
+        if (user && user.sellerId) {
+          console.log('🔐 AuthContext: Setting sellerId:', user.sellerId);
+          setSellerId(user.sellerId);
+        }
+        
+        return { success: true, user };
+      } else {
+        console.log('🔐 AuthContext: Login failed - invalid credentials');
+        return { success: false, error: 'Invalid email or password' };
+      }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('🔐 AuthContext: Login error:', error);
       return { success: false, error: error.message };
     }
   };

@@ -55,9 +55,12 @@ const LoginPage = () => {
 
       if (result.success) {
         console.log('✅ Login successful for:', result.user?.name);
+        console.log('🔍 User data:', result.user);
+        console.log('🔍 Navigating to dashboard...');
         const from = location.state?.from?.pathname || "/dashboard";
         navigate(from, { replace: true });
       } else {
+        console.log('❌ Login failed:', result.error);
         setError(result.error || "Login failed. Please check your credentials.");
       }
     } catch (err) {

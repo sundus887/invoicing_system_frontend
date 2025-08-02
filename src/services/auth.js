@@ -17,7 +17,8 @@ export const loginWithEmail = (email, password) => {
     const userData = {
       name: 'HS Softworks Admin',
       email: email,
-      role: 'admin'
+      role: 'admin',
+      sellerId: 'admin-seller-123' // Add sellerId for admin to access seller routes
     };
     
     try {
@@ -35,7 +36,8 @@ export const loginWithEmail = (email, password) => {
     const userData = {
       name: 'Hamda Admin',
       email: email,
-      role: 'admin'
+      role: 'admin',
+      sellerId: 'admin-seller-456' // Add sellerId for admin to access seller routes
     };
     
     try {
