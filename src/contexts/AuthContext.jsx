@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [sellerId, setSellerId] = useState(null);
   const [userRole, setUserRole] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Check authentication status on app load
   useEffect(() => {
@@ -44,11 +44,10 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setSellerId(null);
         setUserRole(null);
-      } finally {
-        setLoading(false);
       }
     };
 
+    // Run auth check immediately without loading state
     checkAuthStatus();
   }, []);
 

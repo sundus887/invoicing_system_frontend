@@ -85,6 +85,13 @@ const LoginPage = () => {
       <div className="max-w-md w-full space-y-8">
         <div>
                      <div className="flex flex-col items-center">
+             <div className="mb-6">
+               <img 
+                 src="/loginlogo.jpg" 
+                 alt="Tax Nexus Logo" 
+                 className="w-24 h-24 object-cover rounded-lg shadow-lg"
+               />
+             </div>
              <p className="text-gray-600 text-lg font-medium">Tax Consulting Platform</p>
            </div>
         </div>
