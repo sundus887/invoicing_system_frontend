@@ -34,14 +34,33 @@ function DashboardPage() {
           const dashboardStatsResponse = await api.get('/api/dashboard/stats');
           console.log('✅ Dashboard stats response:', dashboardStatsResponse.data);
           
+          // Use the stats from the backend if available
+          if (dashboardStatsResponse.data.stats) {
+            const backendStats = dashboardStatsResponse.data.stats;
+            setStats({
+              totalClients: backendStats.totalClients || 0,
+              totalInvoices: backendStats.totalInvoices || 0,
+              totalEarnings: 0, // Will be calculated from invoices
+              pendingTasks: backendStats.totalTasks || 0,
+              fbrSubmissions: 0,
+              fbrAccepted: 0,
+              fbrPending: backendStats.pendingFbrInvoices || 0,
+              fbrRejected: 0,
+              invoicesWithHSCodes: 0,
+              totalHSCodes: 0,
+              recentInvoices: [],
+              recentFBRSubmissions: []
+            });
+          }
+          
           // Get additional data for detailed stats
           const [clientsResponse, invoicesResponse] = await Promise.all([
             api.get('/api/clients'),
             api.get('/api/invoices')
           ]);
           
-          const clients = clientsResponse.data || [];
-          const invoices = invoicesResponse.data || [];
+          const clients = clientsResponse.data.clients || [];
+          const invoices = invoicesResponse.data.invoices || [];
           
           // Calculate total earnings from invoices
           const totalEarnings = invoices.reduce((sum, invoice) => {
@@ -95,11 +114,11 @@ function DashboardPage() {
             api.get('/api/tasks')
           ]);
           
-          const clients = clientsResponse.data || [];
-          const invoices = invoicesResponse.data || [];
-          const fbrSubmissions = fbrSubmissionsResponse.data || [];
-          const fbrPending = fbrPendingResponse.data || [];
-          const tasks = tasksResponse.data || [];
+          const clients = clientsResponse.data.clients || [];
+          const invoices = invoicesResponse.data.invoices || [];
+          const fbrSubmissions = fbrSubmissionsResponse.data.submittedInvoices || [];
+          const fbrPending = fbrPendingResponse.data.pendingInvoices || [];
+          const tasks = tasksResponse.data.tasks || [];
           
           // Calculate total earnings from invoices
           const totalEarnings = invoices.reduce((sum, invoice) => {
