@@ -7,15 +7,15 @@ const AppSidebar = () => {
   return (
     <div className="w-64 bg-white shadow-lg min-h-screen">
              {/* Logo */}
-       <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200">
-         <div className="w-8 h-8 flex items-center justify-center">
+       <div className="flex flex-col items-center px-4 py-6 border-b border-gray-200">
+         <div className="mb-3">
            <img 
              src="/logo.jpg" 
              alt="Tax Nexus Logo" 
-             className="w-8 h-8 object-cover rounded-lg"
+             className="w-16 h-16 object-cover rounded-lg shadow-md"
            />
          </div>
-         <div>
+         <div className="text-center">
            <h1 className="font-bold text-lg">Tax Nexus</h1>
            <p className="text-xs text-gray-500">Invoice Management</p>
          </div>

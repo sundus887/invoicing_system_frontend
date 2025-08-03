@@ -84,16 +84,9 @@ const LoginPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <div className="flex flex-col items-center">
-            <div className="mb-6">
-              <img 
-                src="/logo.jpg" 
-                alt="Tax Nexus Logo" 
-                className="w-20 h-20 object-cover rounded-lg shadow-lg"
-              />
-            </div>
-            <p className="text-gray-600 text-lg font-medium">Tax Consulting Platform</p>
-          </div>
+                     <div className="flex flex-col items-center">
+             <p className="text-gray-600 text-lg font-medium">Tax Consulting Platform</p>
+           </div>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
