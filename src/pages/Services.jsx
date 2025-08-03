@@ -388,7 +388,7 @@ function ServicesPage() {
                   <td className="py-3 px-4 text-sm text-gray-900">{service.type}</td>
                   <td className="py-3 px-4 text-sm text-gray-900">{service.category}</td>
                   <td className="py-3 px-4 text-sm text-gray-900">
-                    {service.price ? `$${service.price.toFixed(2)}` : 'N/A'}
+                    {service.price ? `${service.price.toFixed(2)}` : 'N/A'}
                   </td>
                   <td className="py-3 px-4 text-sm text-gray-900">{service.duration || 'N/A'}</td>
                   <td className="py-3 px-4">

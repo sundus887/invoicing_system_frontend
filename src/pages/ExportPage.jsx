@@ -79,25 +79,19 @@ function ExportPage() {
 
       console.log(`🔄 Starting ${type.toUpperCase()} export with options:`, exportOptions);
 
-      let response;
-      let filename;
-
       // Only CSV export is supported
       if (type !== 'csv') {
         setError(`${type.toUpperCase()} export is not available. Only CSV export is supported.`);
         return;
       }
 
-      // Use the available export endpoint
-      response = await api.get('/api/export/excel', {
-        params: exportOptions,
-        responseType: 'text' // Request text response
-      });
-      filename = `invoices-${new Date().toISOString().split('T')[0]}.csv`;
+      // Create CSV data client-side since backend is not available
+      const csvData = await generateCSVData();
+      const filename = `tax-nexus-export-${new Date().toISOString().split('T')[0]}.csv`;
 
       // Handle file download
-      if (response.data) {
-        const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      if (csvData) {
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
@@ -116,6 +110,77 @@ function ExportPage() {
       setError(`Failed to export ${type.toUpperCase()}. Please try again.`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Generate CSV data client-side
+  const generateCSVData = async () => {
+    try {
+      // Fetch data from available endpoints
+      const [invoicesRes, clientsRes, servicesRes, fbrRes] = await Promise.all([
+        api.get('/api/invoices').catch(() => ({ data: { invoices: [] } })),
+        api.get('/api/clients').catch(() => ({ data: { clients: [] } })),
+        api.get('/api/services').catch(() => ({ data: { services: [] } })),
+        api.get('/api/fbrinvoices/submissions').catch(() => ({ data: { submittedInvoices: [] } }))
+      ]);
+
+      const invoices = invoicesRes.data?.invoices || [];
+      const clients = clientsRes.data?.clients || [];
+      const services = servicesRes.data?.services || [];
+      const fbrSubmissions = fbrRes.data?.submittedInvoices || [];
+
+      // Create CSV headers
+      const headers = [
+        'Invoice #',
+        'Client Name',
+        'Client NTN',
+        'Client STRN',
+        'Product/Service',
+        'Quantity',
+        'Unit Price',
+        'Total Value',
+        'Sales Tax',
+        'Final Amount',
+        'Date',
+        'Status',
+        'FBR Status',
+        'FBR Reference',
+        'HS Code'
+      ];
+
+      // Create CSV rows
+      const csvRows = invoices.map(invoice => {
+        const client = clients.find(c => c._id === invoice.buyerId?._id);
+        const fbrInvoice = fbrSubmissions.find(f => f.invoiceId === invoice._id);
+        
+        return [
+          invoice.invoiceNumber || invoice.invoiceNo || '',
+          client?.companyName || '',
+          client?.buyerNTN || '',
+          client?.buyerSTRN || '',
+          invoice.product || '',
+          invoice.units || '',
+          invoice.unitPrice || '',
+          invoice.totalValue || '',
+          invoice.salesTax || '',
+          invoice.finalValue || '',
+          invoice.date ? new Date(invoice.date).toLocaleDateString() : '',
+          invoice.status || 'pending',
+          fbrInvoice?.status || 'Not Submitted',
+          fbrInvoice?.fbrReference || '',
+          invoice.hsCode || ''
+        ].map(field => `"${field}"`).join(',');
+      });
+
+      // Combine headers and data
+      const csvContent = [headers.join(','), ...csvRows].join('\n');
+      
+      // Add BOM for Excel compatibility
+      const BOM = '\uFEFF';
+      return BOM + csvContent;
+    } catch (error) {
+      console.error('Error generating CSV data:', error);
+      throw error;
     }
   };
 
