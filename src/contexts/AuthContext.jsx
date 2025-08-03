@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../services/api';
+import { loginWithEmail, getCurrentUser, isAuthenticated } from '../services/auth';
 
 const AuthContext = createContext();
 
@@ -19,19 +19,18 @@ export const AuthProvider = ({ children }) => {
 
   // Check authentication status on app load
   useEffect(() => {
-    const checkAuthStatus = async () => {
+    const checkAuthStatus = () => {
       try {
-        const token = localStorage.getItem('token');
-        if (token) {
-          const response = await api.get('/auth/me');
-          if (response.data.success) {
-            const userData = response.data.user;
+        if (isAuthenticated()) {
+          const userData = getCurrentUser();
+          if (userData) {
             setUser(userData);
             setSellerId(userData.sellerId);
             setUserRole(userData.role);
           } else {
-            // Clear invalid token
+            // Clear invalid data
             localStorage.removeItem('token');
+            localStorage.removeItem('user');
             setUser(null);
             setSellerId(null);
             setUserRole(null);
@@ -39,8 +38,9 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('Auth check failed:', error);
-        // Clear invalid token
+        // Clear invalid data
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         setUser(null);
         setSellerId(null);
         setUserRole(null);
@@ -53,30 +53,29 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Login function
-  const login = async (email, password) => {
+  const login = async (credentials) => {
     try {
-      const response = await api.post('/auth/login', { email, password });
+      const { email, password } = credentials;
+      const success = loginWithEmail(email, password);
       
-      if (response.data.success) {
-        const { token, user: userData } = response.data;
-        
-        // Store token
-        localStorage.setItem('token', token);
-        
-        // Update state
-        setUser(userData);
-        setSellerId(userData.sellerId);
-        setUserRole(userData.role);
-        
-        return { success: true };
+      if (success) {
+        const userData = getCurrentUser();
+        if (userData) {
+          setUser(userData);
+          setSellerId(userData.sellerId);
+          setUserRole(userData.role);
+          return { success: true, user: userData };
+        } else {
+          return { success: false, error: 'Failed to retrieve user data' };
+        }
       } else {
-        return { success: false, message: response.data.message };
+        return { success: false, error: 'Invalid email or password' };
       }
     } catch (error) {
       console.error('Login failed:', error);
       return { 
         success: false, 
-        message: error.response?.data?.message || 'Login failed' 
+        error: 'Login failed. Please try again.' 
       };
     }
   };
@@ -84,6 +83,7 @@ export const AuthProvider = ({ children }) => {
   // Logout function
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
     setSellerId(null);
     setUserRole(null);
