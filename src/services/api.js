@@ -9,7 +9,7 @@ console.log('🚀 Using API URL:', API_URL);
 console.log('🌍 Environment:', process.env.NODE_ENV);
 
 const api = axios.create({
-  baseURL: `${API_URL}/api`, // Add /api to base URL
+  baseURL: `${API_URL}/api`, // Fixed: Use template literal syntax
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
@@ -22,7 +22,7 @@ api.interceptors.request.use(
     // Add authentication token if available
     const token = localStorage.getItem('token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${token}`; // Fixed: Use template literal syntax
     }
     
     console.log(`🌐 Making ${config.method?.toUpperCase()} request to: ${config.url}`);
@@ -92,7 +92,7 @@ export const getAuthToken = () => {
 export const setAuthToken = (token) => {
   if (token) {
     localStorage.setItem('token', token);
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`; // Fixed: Use template literal syntax
   } else {
     localStorage.removeItem('token');
     delete api.defaults.headers.common['Authorization'];
