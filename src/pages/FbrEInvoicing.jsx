@@ -25,7 +25,7 @@ function FbrEInvoicingPage() {
       console.log('🌐 Fetching pending FBR invoices for seller:', sellerId);
       
       const response = await retryRequest(async () => {
-        return await api.get('/fbrinvoices/pending');
+        return await api.get('/api/fbrinvoices/pending');
       }, 3);
 
       console.log('✅ Backend pending FBR invoices response:', response.data);
@@ -55,7 +55,7 @@ function FbrEInvoicingPage() {
   const fetchSubmittedInvoices = async () => {
     try {
       setError(null);
-      
+
       if (!isSeller() && !isAdmin()) {
         setError('You do not have permission to view FBR invoices.');
         return;
@@ -64,7 +64,7 @@ function FbrEInvoicingPage() {
       console.log('🌐 Fetching submitted FBR invoices for seller:', sellerId);
       
       const response = await retryRequest(async () => {
-        return await api.get('/fbrinvoices/submissions');
+        return await api.get('/api/fbrinvoices/submissions');
       }, 3);
 
       console.log('✅ Backend submitted FBR invoices response:', response.data);
@@ -127,7 +127,7 @@ function FbrEInvoicingPage() {
 
   if (loading) {
     return (
-      <div className="text-center py-8">
+        <div className="text-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
         <p className="mt-2 text-gray-600">Loading FBR invoices...</p>
         {retryCount > 0 && (
@@ -166,7 +166,7 @@ function FbrEInvoicingPage() {
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">FBR E-Invoicing</h2>
-      </div>
+          </div>
 
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 mb-6">
@@ -198,7 +198,7 @@ function FbrEInvoicingPage() {
       {activeTab === 'pending' && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="min-w-full">
-            <thead className="bg-gray-50">
+              <thead className="bg-gray-50">
               <tr>
                 <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Invoice #</th>
                 <th className="py-3 px-4 text-left text-sm font-medium text-gray-700">Client</th>
@@ -247,8 +247,8 @@ function FbrEInvoicingPage() {
                   </tr>
                 ))
               )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
         </div>
       )}
 
@@ -302,13 +302,13 @@ function FbrEInvoicingPage() {
                       {fbrInvoice.submittedAt ? new Date(fbrInvoice.submittedAt).toLocaleDateString() : 'N/A'}
                     </td>
                     <td className="py-3 px-4">
-                      <button
+                        <button
                         onClick={() => window.open(`/api/fbrinvoices/generate-pdf/${fbrInvoice.invoiceNumber}`, '_blank')}
                         className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
                         disabled={!isSeller() && !isAdmin()}
                       >
                         Download PDF
-                      </button>
+                          </button>
                     </td>
                   </tr>
                 ))

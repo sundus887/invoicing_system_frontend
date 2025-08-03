@@ -282,9 +282,9 @@ function InvoicesPage() {
   useEffect(() => {
     // Only fetch data if user has permission
     if (isSeller() || isAdmin()) {
-      fetchInvoices();
-      fetchBuyers();
-      checkFbrAuthStatus();
+    fetchInvoices();
+    fetchBuyers();
+    checkFbrAuthStatus();
     }
   }, [sellerId, isSeller, isAdmin]);
 

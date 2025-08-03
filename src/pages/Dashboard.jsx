@@ -100,20 +100,20 @@ function DashboardPage() {
           console.log('⚠️ Dashboard stats endpoint not available, fetching individual data...');
           
           // Fallback: fetch individual endpoints
-          const [
-            clientsResponse, 
-            invoicesResponse, 
-            fbrSubmissionsResponse,
-            fbrPendingResponse,
-            tasksResponse
-          ] = await Promise.all([
-            api.get('/api/clients'),
-            api.get('/api/invoices'),
-            api.get('/api/fbrinvoices/submissions'),
-            api.get('/api/fbrinvoices/pending'),
-            api.get('/api/tasks')
-          ]);
-          
+        const [
+          clientsResponse, 
+          invoicesResponse, 
+          fbrSubmissionsResponse,
+          fbrPendingResponse,
+          tasksResponse
+        ] = await Promise.all([
+          api.get('/api/clients'),
+          api.get('/api/invoices'),
+          api.get('/api/fbrinvoices/submissions'),
+          api.get('/api/fbrinvoices/pending'),
+          api.get('/api/tasks')
+        ]);
+        
           const clients = clientsResponse.data.clients || [];
           const invoices = invoicesResponse.data.invoices || [];
           const fbrSubmissions = fbrSubmissionsResponse.data.submittedInvoices || [];
@@ -121,66 +121,66 @@ function DashboardPage() {
           const tasks = tasksResponse.data.tasks || [];
           
           // Calculate total earnings from invoices
-          const totalEarnings = invoices.reduce((sum, invoice) => {
-            if (invoice.items && invoice.items.length > 0) {
-              return sum + invoice.items.reduce((itemSum, item) => {
-                return itemSum + (parseFloat(item.finalValue) || 0);
-              }, 0);
-            } else {
-              return sum + (parseFloat(invoice.finalValue) || parseFloat(invoice.totalAmount) || 0);
-            }
-          }, 0);
+        const totalEarnings = invoices.reduce((sum, invoice) => {
+          if (invoice.items && invoice.items.length > 0) {
+            return sum + invoice.items.reduce((itemSum, item) => {
+              return itemSum + (parseFloat(item.finalValue) || 0);
+            }, 0);
+          } else {
+            return sum + (parseFloat(invoice.finalValue) || parseFloat(invoice.totalAmount) || 0);
+          }
+        }, 0);
 
-          // Calculate FBR statistics
-          const fbrAccepted = fbrSubmissions.filter(sub => sub.status === 'accepted').length;
-          const fbrRejected = fbrSubmissions.filter(sub => sub.status === 'rejected').length;
-          const fbrPendingCount = fbrPending.length;
+        // Calculate FBR statistics
+        const fbrAccepted = fbrSubmissions.filter(sub => sub.status === 'accepted').length;
+        const fbrRejected = fbrSubmissions.filter(sub => sub.status === 'rejected').length;
+        const fbrPendingCount = fbrPending.length;
 
-          // Calculate HS Code statistics
-          const invoicesWithHSCodes = invoices.filter(invoice => {
-            if (invoice.items && invoice.items.length > 0) {
-              return invoice.items.some(item => item.hsCode && item.hsCode !== '9983.99.00');
-            }
-            return invoice.hsCode && invoice.hsCode !== '9983.99.00';
-          }).length;
+        // Calculate HS Code statistics
+        const invoicesWithHSCodes = invoices.filter(invoice => {
+          if (invoice.items && invoice.items.length > 0) {
+            return invoice.items.some(item => item.hsCode && item.hsCode !== '9983.99.00');
+          }
+          return invoice.hsCode && invoice.hsCode !== '9983.99.00';
+        }).length;
 
-          const totalHSCodes = invoices.reduce((count, invoice) => {
-            if (invoice.items && invoice.items.length > 0) {
-              return count + invoice.items.filter(item => item.hsCode && item.hsCode !== '9983.99.00').length;
-            }
-            return count + (invoice.hsCode && invoice.hsCode !== '9983.99.00' ? 1 : 0);
-          }, 0);
+        const totalHSCodes = invoices.reduce((count, invoice) => {
+          if (invoice.items && invoice.items.length > 0) {
+            return count + invoice.items.filter(item => item.hsCode && item.hsCode !== '9983.99.00').length;
+          }
+          return count + (invoice.hsCode && invoice.hsCode !== '9983.99.00' ? 1 : 0);
+        }, 0);
 
-          // Get recent invoices (last 5)
-          const recentInvoices = invoices
-            .sort((a, b) => new Date(b.createdAt || b.issuedDate) - new Date(a.createdAt || a.issuedDate))
-            .slice(0, 5);
+        // Get recent invoices (last 5)
+        const recentInvoices = invoices
+          .sort((a, b) => new Date(b.createdAt || b.issuedDate) - new Date(a.createdAt || a.issuedDate))
+          .slice(0, 5);
 
-          // Get recent FBR submissions (last 5)
-          const recentFBRSubmissions = fbrSubmissions
-            .sort((a, b) => new Date(b.submissionDate || b.createdAt) - new Date(a.submissionDate || a.createdAt))
-            .slice(0, 5);
+        // Get recent FBR submissions (last 5)
+        const recentFBRSubmissions = fbrSubmissions
+          .sort((a, b) => new Date(b.submissionDate || b.createdAt) - new Date(a.submissionDate || a.createdAt))
+          .slice(0, 5);
 
-          // Calculate pending tasks
-          const pendingTasks = tasks.filter(task => task.status === 'pending').length;
+        // Calculate pending tasks
+        const pendingTasks = tasks.filter(task => task.status === 'pending').length;
 
-          setStats({
-            totalClients: clients.length,
-            totalInvoices: invoices.length,
-            totalEarnings: totalEarnings,
-            pendingTasks: pendingTasks,
-            // FBR statistics
-            fbrSubmissions: fbrSubmissions.length,
-            fbrAccepted: fbrAccepted,
-            fbrPending: fbrPendingCount,
-            fbrRejected: fbrRejected,
-            // HS Code statistics
-            invoicesWithHSCodes: invoicesWithHSCodes,
-            totalHSCodes: totalHSCodes,
-            // Recent activity
-            recentInvoices: recentInvoices,
-            recentFBRSubmissions: recentFBRSubmissions
-          });
+        setStats({
+          totalClients: clients.length,
+          totalInvoices: invoices.length,
+          totalEarnings: totalEarnings,
+          pendingTasks: pendingTasks,
+          // FBR statistics
+          fbrSubmissions: fbrSubmissions.length,
+          fbrAccepted: fbrAccepted,
+          fbrPending: fbrPendingCount,
+          fbrRejected: fbrRejected,
+          // HS Code statistics
+          invoicesWithHSCodes: invoicesWithHSCodes,
+          totalHSCodes: totalHSCodes,
+          // Recent activity
+          recentInvoices: recentInvoices,
+          recentFBRSubmissions: recentFBRSubmissions
+        });
         }
         
       } catch (error) {

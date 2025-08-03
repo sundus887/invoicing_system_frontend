@@ -9,7 +9,7 @@ console.log('🚀 Using API URL:', API_URL);
 console.log('🌍 Environment:', process.env.NODE_ENV);
 
 const api = axios.create({
-  baseURL: `${API_URL}/api`, // Fixed: Add /api back to baseURL
+  baseURL: API_URL, // Fixed: Remove /api from baseURL since endpoints already include it
   timeout: 15000, // Increased timeout for production
   headers: {
     'Content-Type': 'application/json',
