@@ -248,7 +248,7 @@ function DashboardPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Tax Nexus Dashboard</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
       
       {/* Backend Status Info */}
       <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
