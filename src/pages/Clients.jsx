@@ -50,8 +50,8 @@ function ClientsPage() {
       const response = await api.get('/api/clients'); // Fixed: Add /api prefix
       console.log('✅ Backend clients response:', response.data);
       
-      // Backend now automatically filters by seller
-      setClients(response.data.buyers || response.data);
+      // Backend now returns { success: true, clients: [...] }
+      setClients(response.data.clients || []);
     } catch (err) {
       console.error('❌ Error fetching clients:', err);
       setError(err.response?.data?.message || 'Failed to load clients. Please try again.');
