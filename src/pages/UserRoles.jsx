@@ -62,7 +62,7 @@ export default function UserRoles() {
       setError(null);
       const response = await api.get('/api/users'); // ✅ Fixed API URL
       console.log('✅ Users loaded:', response.data);
-      setUsers(response.data);
+      setUsers(response.data.users || []);
     } catch (err) {
       console.error('❌ Error fetching users:', err);
       setError('Failed to load users. Please try again.');
@@ -76,7 +76,7 @@ export default function UserRoles() {
     try {
       const response = await api.get('/api/users/meta/role-templates'); // ✅ Fixed API URL
       console.log('✅ Role templates loaded:', response.data);
-      setRoleTemplates(response.data || {}); // ✅ Store as object
+      setRoleTemplates(response.data.roleTemplates || {}); // ✅ Store as object
     } catch (err) {
       console.error('❌ Error fetching role templates:', err);
     }

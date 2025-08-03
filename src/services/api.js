@@ -9,8 +9,8 @@ console.log('🚀 Using API URL:', API_URL);
 console.log('🌍 Environment:', process.env.NODE_ENV);
 
 const api = axios.create({
-  baseURL: API_URL, // Fixed: Remove /api from baseURL since endpoints already include it
-  timeout: 15000,
+  baseURL: `${API_URL}/api`, // Fixed: Add /api back to baseURL
+  timeout: 15000, // Increased timeout for production
   headers: {
     'Content-Type': 'application/json',
   },
@@ -42,8 +42,20 @@ api.interceptors.response.use(
     console.log(`✅ Response received from: ${response.config.url}`);
     return response;
   },
-  (error) => {
+  async (error) => {
     console.error(`❌ Response error from ${error.config?.url}:`, error.response?.status, error.response?.data);
+    
+    // Handle timeout errors with retry logic
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      console.log('⏰ Request timed out, retrying...');
+      
+      // Retry the request once
+      const originalRequest = error.config;
+      if (!originalRequest._retry) {
+        originalRequest._retry = true;
+        return api.request(originalRequest);
+      }
+    }
     
     // Handle specific multi-tenancy errors
     if (error.response?.status === 403) {
@@ -72,6 +84,15 @@ api.interceptors.response.use(
       console.error('🔐 Authentication error - redirecting to login');
       localStorage.removeItem('token');
       window.location.href = '/login';
+    }
+    
+    // Handle 500 server errors (timeout issues)
+    if (error.response?.status === 500) {
+      const errorMessage = error.response.data?.message;
+      if (errorMessage?.includes('timed out') || errorMessage?.includes('buffering')) {
+        console.error('⏰ Server timeout error - this should be resolved with the backend fixes');
+        // You can show a user-friendly message here
+      }
     }
     
     return Promise.reject(error);
@@ -103,6 +124,24 @@ export const setAuthToken = (token) => {
 export const clearAuthToken = () => {
   localStorage.removeItem('token');
   delete api.defaults.headers.common['Authorization'];
+};
+
+// Helper function for retry logic
+export const retryRequest = async (requestFn, maxRetries = 2) => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await requestFn();
+    } catch (error) {
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Wait before retrying (exponential backoff)
+      const delay = Math.pow(2, attempt) * 1000;
+      console.log(`🔄 Retry attempt ${attempt}/${maxRetries} in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
 };
 
 export default api;

@@ -35,10 +35,10 @@ function ExportPage() {
         api.get('/api/fbrinvoices/submissions')
       ]);
 
-      const invoices = invoicesRes.data || [];
-      const clients = clientsRes.data || [];
-      const services = servicesRes.data || [];
-      const fbrSubmissions = fbrRes.data?.submissions || [];
+      const invoices = invoicesRes.data?.invoices || [];
+      const clients = clientsRes.data?.clients || [];
+      const services = servicesRes.data?.services || [];
+      const fbrSubmissions = fbrRes.data?.submittedInvoices || [];
 
       // Calculate HS code statistics
       const invoicesWithHSCodes = invoices.filter(invoice => {
@@ -90,7 +90,8 @@ function ExportPage() {
 
       // Use the available export endpoint
       response = await api.get('/api/export/excel', {
-        params: exportOptions
+        params: exportOptions,
+        responseType: 'text' // Request text response
       });
       filename = `invoices-${new Date().toISOString().split('T')[0]}.csv`;
 
