@@ -28,13 +28,32 @@ const FbrEInvoicingPage = () => {
       setLoading(true);
       setError(null);
 
-      // Load FBR summary
-      const summaryResponse = await api.get('/api/fbrinvoices/summary');
-      setSummary(summaryResponse.data.summary);
+      // Load FBR submissions and pending invoices
+      const [submissionsResponse, pendingResponse] = await Promise.all([
+        api.get('/api/fbrinvoices/submissions'),
+        api.get('/api/fbrinvoices/pending')
+      ]);
 
-      // Load FBR submissions
-      const submissionsResponse = await api.get('/api/fbrinvoices/submissions');
-      setSubmissions(submissionsResponse.data.submissions);
+      const submissions = submissionsResponse.data.submittedInvoices || [];
+      const pending = pendingResponse.data.pendingInvoices || [];
+
+      // Calculate summary from the data
+      const totalSubmissions = submissions.length;
+      const pendingSubmissions = pending.length;
+      const acceptedSubmissions = submissions.filter(s => s.status === 'accepted').length;
+      const rejectedSubmissions = submissions.filter(s => s.status === 'rejected').length;
+      const successRate = totalSubmissions > 0 ? Math.round((acceptedSubmissions / totalSubmissions) * 100) : 0;
+
+      const calculatedSummary = {
+        totalSubmissions: totalSubmissions,
+        pendingSubmissions: pendingSubmissions,
+        successRate: successRate,
+        totalInvoices: totalSubmissions + pendingSubmissions,
+        recentSubmissions: submissions.slice(0, 5) // Show last 5 submissions
+      };
+
+      setSummary(calculatedSummary);
+      setSubmissions(submissions);
 
     } catch (err) {
       console.error('Error fetching FBR data:', err);
