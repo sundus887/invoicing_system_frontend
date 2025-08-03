@@ -89,7 +89,7 @@ const LoginPage = () => {
                <img 
                  src="/loginlogo.jpg" 
                  alt="Tax Nexus Logo" 
-                 className="w-48 h-48 object-cover rounded-lg shadow-lg"
+                 className="w-64 h-64 object-cover rounded-lg shadow-lg"
                />
              </div>
              <p className="text-gray-600 text-lg font-medium">Tax Consulting Platform</p>
