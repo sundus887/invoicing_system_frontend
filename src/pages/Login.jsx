@@ -87,16 +87,12 @@ const LoginPage = () => {
           <div className="flex flex-col items-center">
             <div className="mb-6">
               <img 
-                src="/tax-nexus-logo-color-full-lg.jpg" 
+                src="/logo.jpg" 
                 alt="Tax Nexus Logo" 
-                className="w-16 h-16 object-cover rounded-lg shadow-lg"
+                className="w-20 h-20 object-cover rounded-lg shadow-lg"
               />
             </div>
-            <h2 className="text-3xl font-extrabold text-gray-900">
-              Tax Nexus
-            </h2>
-            <p className="text-gray-600 mt-2">Professional Invoice Management</p>
-            <p className="text-sm text-gray-500 mt-1">Multi-Tenant Tax Consultancy Platform</p>
+            <p className="text-gray-600 text-lg font-medium">Tax Consulting Platform</p>
           </div>
         </div>
         
@@ -186,15 +182,7 @@ const LoginPage = () => {
           </div>
         </form>
 
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-blue-800 mb-2">ℹ Multi-Tenant Platform</h3>
-          <div className="text-xs text-blue-700 space-y-1">
-            <p><strong>Admin:</strong> Full system access and user management</p>
-            <p><strong>Seller:</strong> Manage own services, invoices, and clients</p>
-            <p><strong>Buyer:</strong> View own invoices and profile</p>
-            <p><strong>Data Isolation:</strong> Each seller only sees their own data</p>
-          </div>
-        </div>
+
       </div>
     </div>
   );

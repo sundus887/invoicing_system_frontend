@@ -10,7 +10,7 @@ const AppSidebar = () => {
        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200">
          <div className="w-8 h-8 flex items-center justify-center">
            <img 
-             src="/tax-nexus-logo-color-full-lg.jpg" 
+             src="/logo.jpg" 
              alt="Tax Nexus Logo" 
              className="w-8 h-8 object-cover rounded-lg"
            />
