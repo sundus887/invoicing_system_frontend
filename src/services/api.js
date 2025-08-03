@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Use deployed backend for production, local for development
 const API_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://your-backend-name.vercel.app'  // TODO: Replace with your actual backend URL
+  ? 'https://hsoftworks.vercel.app'  // Your deployed backend URL
   : 'http://localhost:5000';
 
 console.log('🚀 Using API URL:', API_URL);
