@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
 function ClientsPage() {
+  const { user, sellerId, isSeller, isAdmin } = useAuth();
+  
   const [clients, setClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -31,17 +34,27 @@ function ClientsPage() {
     businessType: "",
   });
 
-  // Fetch clients (buyers) from backend
+  // Fetch clients (buyers) from backend with seller context
   const fetchClients = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get('/api/clients');
+      
+      // Check if user has permission to view clients
+      if (!isSeller() && !isAdmin()) {
+        setError('You do not have permission to view clients');
+        return;
+      }
+      
+      console.log('📋 Fetching clients for seller:', sellerId);
+      const response = await api.get('/clients'); // Fixed: Remove /api prefix
       console.log('✅ Backend clients response:', response.data);
-      setClients(response.data);
+      
+      // Backend now automatically filters by seller
+      setClients(response.data.buyers || response.data);
     } catch (err) {
       console.error('❌ Error fetching clients:', err);
-      setError('Failed to load clients. Please try again.');
+      setError(err.response?.data?.message || 'Failed to load clients. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -50,7 +63,7 @@ function ClientsPage() {
   // Fetch sellers from backend
   const fetchSellers = async () => {
     try {
-      const response = await api.get('/api/seller-settings');
+      const response = await api.get('/seller-settings'); // Fixed: Remove /api prefix
       console.log('✅ Backend sellers response:', response.data);
       return response.data;
     } catch (err) {
@@ -60,8 +73,11 @@ function ClientsPage() {
   };
 
   useEffect(() => {
-    fetchClients();
-  }, []);
+    // Only fetch data if user has permission
+    if (isSeller() || isAdmin()) {
+      fetchClients();
+    }
+  }, [sellerId, isSeller, isAdmin]);
 
   const handleBuyerChange = (e) => {
     setBuyerForm({ ...buyerForm, [e.target.name]: e.target.value });
@@ -73,8 +89,15 @@ function ClientsPage() {
 
   const handleAddBuyer = async (e) => {
     e.preventDefault();
+    
+    // Check permissions
+    if (!isSeller() && !isAdmin()) {
+      setError('Only sellers can add buyers');
+      return;
+    }
+    
     try {
-      console.log('🔄 Submitting buyer data:', buyerForm);
+      console.log('🔄 Submitting buyer data with seller context:', sellerId);
       
       // Validate required fields
       if (!buyerForm.companyName || !buyerForm.buyerSTRN || !buyerForm.buyerNTN || !buyerForm.address) {
@@ -82,7 +105,7 @@ function ClientsPage() {
         return;
       }
       
-      const response = await api.post('/api/clients', buyerForm);
+      const response = await api.post('/clients', buyerForm); // Fixed: Remove /api prefix
       console.log('✅ Buyer added successfully:', response.data);
       
       setShowForm(false);
@@ -93,20 +116,23 @@ function ClientsPage() {
         address: "",
         truckNo: "",
       });
-       setError(null);
+      setError(null);
       await fetchClients();
     } catch (err) {
       console.error('❌ Error adding buyer:', err);
-      if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else {
-        setError('Failed to add buyer. Please try again.');
-      }
+      setError(err.response?.data?.message || 'Failed to add buyer. Please try again.');
     }
   };
 
   const handleAddSeller = async (e) => {
     e.preventDefault();
+    
+    // Only admins can add sellers
+    if (!isAdmin()) {
+      setError('Only admins can add sellers');
+      return;
+    }
+    
     try {
       console.log('🔄 Submitting seller data:', sellerForm);
       
@@ -116,7 +142,7 @@ function ClientsPage() {
         return;
       }
       
-      const response = await api.post('/api/seller-settings', sellerForm);
+      const response = await api.post('/seller-settings', sellerForm); // Fixed: Remove /api prefix
       console.log('✅ Seller added successfully:', response.data);
       
       setShowForm(false);
@@ -133,11 +159,7 @@ function ClientsPage() {
       setError(null);
     } catch (err) {
       console.error('❌ Error adding seller:', err);
-      if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else {
-        setError('Failed to add seller. Please try again.');
-      }
+      setError(err.response?.data?.message || 'Failed to add seller. Please try again.');
     }
   };
 
@@ -179,6 +201,13 @@ function ClientsPage() {
 
   const handleUpdateBuyer = async (e) => {
     e.preventDefault();
+    
+    // Check permissions
+    if (!isSeller() && !isAdmin()) {
+      setError('Only sellers can update buyers');
+      return;
+    }
+    
     try {
       console.log('🔄 Updating buyer data:', buyerForm);
       
@@ -188,36 +217,38 @@ function ClientsPage() {
         return;
       }
       
-      const response = await api.put(`/api/clients/${editingClient._id}`, buyerForm);
+      const response = await api.put(`/clients/${editingClient._id}`, buyerForm); // Fixed: Remove /api prefix and use template literal
       console.log('✅ Buyer updated successfully:', response.data);
       
       setShowForm(false);
       setEditingClient(null);
       setIsEditing(false);
-             setBuyerForm({
-         companyName: "",
-         buyerSTRN: "",
-         buyerNTN: "",
-         address: "",
-         truckNo: "",
-       });
-       setError(null);
-       await fetchClients(); // Refresh the list
+      setBuyerForm({
+        companyName: "",
+        buyerSTRN: "",
+        buyerNTN: "",
+        address: "",
+        truckNo: "",
+      });
+      setError(null);
+      await fetchClients(); // Refresh the list
     } catch (err) {
       console.error('❌ Error updating buyer:', err);
-      if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else {
-        setError('Failed to update buyer. Please try again.');
-      }
+      setError(err.response?.data?.message || 'Failed to update buyer. Please try again.');
     }
   };
 
   const handleDeleteBuyer = async (clientId) => {
+    // Check permissions
+    if (!isSeller() && !isAdmin()) {
+      setError('Only sellers can delete buyers');
+      return;
+    }
+    
     if (window.confirm('Are you sure you want to delete this buyer?')) {
       try {
-        console.log('🗑️ Deleting buyer:', clientId);
-        await api.delete(`/api/clients/${clientId}`);
+        console.log('🗑 Deleting buyer:', clientId);
+        await api.delete(`/clients/${clientId}`); // Fixed: Remove /api prefix and use template literal
         console.log('✅ Buyer deleted successfully');
         await fetchClients(); // Refresh the list
       } catch (err) {
@@ -227,11 +258,24 @@ function ClientsPage() {
     }
   };
 
+  // Show loading state
   if (loading) {
     return <div className="text-center py-8">Loading clients...</div>;
   }
 
-  if (error) {
+  // Show permission error
+  if (!isSeller() && !isAdmin()) {
+    return (
+      <div className="text-center py-8">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          You do not have permission to view clients. Only sellers and admins can access this page.
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error && clients.length === 0) {
     return (
       <div className="text-center py-8">
         <div className="text-red-600 mb-4">{error}</div>
@@ -247,6 +291,29 @@ function ClientsPage() {
 
   return (
     <div>
+      {/* Seller Context Information */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-blue-800">Seller Context</h3>
+            <p className="text-sm text-blue-600">
+              Logged in as: <strong>{user?.name}</strong> ({user?.role})
+            </p>
+            <p className="text-sm text-blue-600">
+              Seller ID: <code className="bg-blue-100 px-1 rounded">{sellerId || 'Not set'}</code>
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-blue-600">
+              Total Buyers: <strong>{clients.length}</strong>
+            </p>
+            <p className="text-sm text-blue-600">
+              Active Buyers: <strong>{clients.filter(c => c.status !== 'inactive').length}</strong>
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold">Buyer Management</h2>
         <button
@@ -260,6 +327,19 @@ function ClientsPage() {
         </button>
       </div>
       
+      {/* Show error message at top if there's an error but we have data */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+          <button 
+            onClick={fetchClients}
+            className="ml-2 underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      
       {showForm && (
         <div className="bg-white p-6 rounded-xl shadow mb-6">
           <h3 className="text-lg font-semibold mb-4">
@@ -271,86 +351,86 @@ function ClientsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Company Name *
                 </label>
-              <input 
+                <input 
                   type="text"
-                name="companyName" 
-                value={buyerForm.companyName} 
-                onChange={handleBuyerChange} 
+                  name="companyName" 
+                  value={buyerForm.companyName} 
+                  onChange={handleBuyerChange} 
                   className="w-full border p-2 rounded"
-                required 
-              />
+                  required 
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Buyer STRN *
                 </label>
-              <input 
+                <input 
                   type="text"
-                name="buyerSTRN" 
-                value={buyerForm.buyerSTRN} 
-                onChange={handleBuyerChange} 
+                  name="buyerSTRN" 
+                  value={buyerForm.buyerSTRN} 
+                  onChange={handleBuyerChange} 
                   className="w-full border p-2 rounded"
-                required 
-              />
+                  required 
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Buyer NTN *
                 </label>
-              <input 
+                <input 
                   type="text"
-                name="buyerNTN" 
-                value={buyerForm.buyerNTN} 
-                onChange={handleBuyerChange} 
+                  name="buyerNTN" 
+                  value={buyerForm.buyerNTN} 
+                  onChange={handleBuyerChange} 
                   className="w-full border p-2 rounded"
-                required 
-              />
+                  required 
+                />
               </div>
-                             <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   Address *
-                 </label>
-              <input 
-                   type="text"
-                name="address" 
-                value={buyerForm.address} 
-                onChange={handleBuyerChange} 
-                   className="w-full border p-2 rounded"
-                required 
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address *
+                </label>
+                <input 
+                  type="text"
+                  name="address" 
+                  value={buyerForm.address} 
+                  onChange={handleBuyerChange} 
+                  className="w-full border p-2 rounded"
+                  required 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Truck No
+                </label>
+                <input 
+                  type="text"
+                  name="truckNo"
+                  value={buyerForm.truckNo}
+                  onChange={handleBuyerChange}
+                  className="w-full border p-2 rounded"
+                />
+              </div>
             </div>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   Truck No
-                 </label>
-              <input 
-                   type="text"
-                   name="truckNo"
-                   value={buyerForm.truckNo}
-                   onChange={handleBuyerChange}
-                   className="w-full border p-2 rounded"
-                 />
-               </div>
-            </div>
-          <div className="flex gap-2 mt-4">
+            <div className="flex gap-2 mt-4">
               <button
                 type="submit"
                 className="bg-black text-white px-4 py-2 rounded"
               >
                 {isEditing ? 'Update Buyer' : 'Add Buyer'}
-            </button>
-            <button 
-              type="button" 
+              </button>
+              <button 
+                type="button" 
                 onClick={() => {
                   setShowForm(false);
                   clearForm();
                 }}
                 className="bg-gray-500 text-white px-4 py-2 rounded"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
@@ -358,7 +438,7 @@ function ClientsPage() {
         <div className="p-6 border-b">
           <h3 className="text-lg font-semibold">Buyer List</h3>
         </div>
-          <div className="overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
@@ -371,25 +451,25 @@ function ClientsPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   NTN
                 </th>
-                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                   Address
-                 </th>
-                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                   Truck No
-                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Address
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Truck No
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
-                </tr>
-              </thead>
+              </tr>
+            </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-                {clients.length === 0 ? (
-                  <tr>
+              {clients.length === 0 ? (
+                <tr>
                   <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
                     No buyers found
-                    </td>
-                  </tr>
-                ) : (
+                  </td>
+                </tr>
+              ) : (
                 clients.map((client, index) => (
                   <tr key={client._id || client.id || index} className="bg-white border-b hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -401,12 +481,12 @@ function ClientsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {client.buyerNTN}
                     </td>
-                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                       {client.address}
-                     </td>
-                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                       {client.truckNo}
-                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {client.address}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {client.truckNo}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex gap-2">
                         <button 
@@ -423,11 +503,11 @@ function ClientsPage() {
                         </button>
                       </div>
                     </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
