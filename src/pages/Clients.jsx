@@ -47,7 +47,7 @@ function ClientsPage() {
       }
       
       console.log('📋 Fetching clients for seller:', sellerId);
-      const response = await api.get('/clients'); // Fixed: Remove /api prefix
+      const response = await api.get('/api/clients'); // Fixed: Add /api prefix
       console.log('✅ Backend clients response:', response.data);
       
       // Backend now automatically filters by seller
@@ -63,7 +63,7 @@ function ClientsPage() {
   // Fetch sellers from backend
   const fetchSellers = async () => {
     try {
-      const response = await api.get('/seller-settings'); // Fixed: Remove /api prefix
+      const response = await api.get('/api/seller-settings'); // Fixed: Add /api prefix
       console.log('✅ Backend sellers response:', response.data);
       return response.data;
     } catch (err) {
@@ -105,7 +105,7 @@ function ClientsPage() {
         return;
       }
       
-      const response = await api.post('/clients', buyerForm); // Fixed: Remove /api prefix
+      const response = await api.post('/api/clients', buyerForm); // Fixed: Add /api prefix
       console.log('✅ Buyer added successfully:', response.data);
       
       setShowForm(false);
@@ -142,7 +142,7 @@ function ClientsPage() {
         return;
       }
       
-      const response = await api.post('/seller-settings', sellerForm); // Fixed: Remove /api prefix
+      const response = await api.post('/api/seller-settings', sellerForm); // Fixed: Add /api prefix
       console.log('✅ Seller added successfully:', response.data);
       
       setShowForm(false);
@@ -217,7 +217,7 @@ function ClientsPage() {
         return;
       }
       
-      const response = await api.put(`/clients/${editingClient._id}`, buyerForm); // Fixed: Remove /api prefix and use template literal
+      const response = await api.put(`/api/clients/${editingClient._id}`, buyerForm); // Fixed: Add /api prefix
       console.log('✅ Buyer updated successfully:', response.data);
       
       setShowForm(false);
@@ -248,7 +248,7 @@ function ClientsPage() {
     if (window.confirm('Are you sure you want to delete this buyer?')) {
       try {
         console.log('🗑 Deleting buyer:', clientId);
-        await api.delete(`/clients/${clientId}`); // Fixed: Remove /api prefix and use template literal
+        await api.delete(`/api/clients/${clientId}`); // Fixed: Add /api prefix
         console.log('✅ Buyer deleted successfully');
         await fetchClients(); // Refresh the list
       } catch (err) {
