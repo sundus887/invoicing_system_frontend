@@ -31,13 +31,13 @@ export const loginWithEmail = (email, password) => {
     }
   }
   
-  // Add your credentials
-  if (email === 'hamda09@gmail.com' && password === 'your_password_here') {
+  // Tax Nexus credentials
+  if (email === 'taxnexus710@gmail.com' && password === 'Taxnexus123') {
     const userData = {
-      name: 'Hamda Admin',
+      name: 'Tax Nexus Admin',
       email: email,
       role: 'admin',
-      sellerId: 'admin-seller-456' // Add sellerId for admin to access seller routes
+      sellerId: 'taxnexus-seller-001' // Add sellerId for admin to access seller routes
     };
     
     try {
