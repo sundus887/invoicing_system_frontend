@@ -20,6 +20,7 @@ export const AuthProvider = ({ children }) => {
   // Check authentication status on app load
   useEffect(() => {
     const checkAuthStatus = () => {
+      setLoading(true);
       try {
         if (isAuthenticated()) {
           const userData = getCurrentUser();
@@ -44,10 +45,12 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setSellerId(null);
         setUserRole(null);
+      } finally {
+        setLoading(false);
       }
     };
 
-    // Run auth check immediately without loading state
+    // Run auth check immediately
     checkAuthStatus();
   }, []);
 
