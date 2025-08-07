@@ -10,99 +10,36 @@ function DashboardPage() {
     totalInvoices: 0,
     totalEarnings: 0,
     pendingTasks: 0,
-    // New FBR-related stats
     fbrSubmissions: 0,
     fbrAccepted: 0,
     fbrPending: 0,
     fbrRejected: 0,
-    // HS Code stats
     invoicesWithHSCodes: 0,
     totalHSCodes: 0,
-    // Recent activity
     recentInvoices: [],
     recentFBRSubmissions: []
   });
 
   useEffect(() => {
-    // Fetch comprehensive dashboard stats from API
     const fetchDashboardStats = async () => {
       try {
         setLoading(true);
-        
-        // First try to get dashboard stats from the dedicated endpoint
+
+        // Try to get dashboard stats from the backend
+        let backendStats = {};
         try {
           const dashboardStatsResponse = await api.get('/api/dashboard/stats');
-          console.log('✅ Dashboard stats response:', dashboardStatsResponse.data);
-          
-          // Use the stats from the backend if available
           if (dashboardStatsResponse.data.stats) {
-            const backendStats = dashboardStatsResponse.data.stats;
-            setStats({
-              totalClients: backendStats.totalClients || 0,
-              totalInvoices: backendStats.totalInvoices || 0,
-              totalEarnings: 0, // Will be calculated from invoices
-              pendingTasks: backendStats.totalTasks || 0,
-              fbrSubmissions: 0,
-              fbrAccepted: 0,
-              fbrPending: backendStats.pendingFbrInvoices || 0,
-              fbrRejected: 0,
-              invoicesWithHSCodes: 0,
-              totalHSCodes: 0,
-              recentInvoices: [],
-              recentFBRSubmissions: []
-            });
+            backendStats = dashboardStatsResponse.data.stats;
           }
-          
-          // Get additional data for detailed stats
-          const [clientsResponse, invoicesResponse] = await Promise.all([
-            api.get('/api/clients'),
-            api.get('/api/invoices')
-          ]);
-          
-          const clients = clientsResponse.data.clients || [];
-          const invoices = invoicesResponse.data.invoices || [];
-          
-          // Calculate total earnings from invoices
-          const totalEarnings = invoices.reduce((sum, invoice) => {
-            if (invoice.items && invoice.items.length > 0) {
-              return sum + invoice.items.reduce((itemSum, item) => {
-                return itemSum + (parseFloat(item.finalValue) || 0);
-              }, 0);
-            } else {
-              return sum + (parseFloat(invoice.finalValue) || parseFloat(invoice.totalAmount) || 0);
-            }
-          }, 0);
+        } catch {
+          // Ignore, fallback to manual aggregation
+        }
 
-          // Get recent invoices (last 5)
-          const recentInvoices = invoices
-            .sort((a, b) => new Date(b.createdAt || b.issuedDate) - new Date(a.createdAt || a.issuedDate))
-            .slice(0, 5);
-
-          setStats({
-            totalClients: clients.length,
-            totalInvoices: invoices.length,
-            totalEarnings: totalEarnings,
-            pendingTasks: 0, // Default for now
-            // FBR statistics (default values)
-            fbrSubmissions: 0,
-            fbrAccepted: 0,
-            fbrPending: 0,
-            fbrRejected: 0,
-            // HS Code statistics
-            invoicesWithHSCodes: 0,
-            totalHSCodes: 0,
-            // Recent activity
-            recentInvoices: recentInvoices,
-            recentFBRSubmissions: []
-          });
-          
-        } catch (dashboardError) {
-          console.log('⚠️ Dashboard stats endpoint not available, fetching individual data...');
-          
-          // Fallback: fetch individual endpoints
+        // Fetch all required data in parallel
         const [
-          clientsResponse, 
-          invoicesResponse, 
+          clientsResponse,
+          invoicesResponse,
           fbrSubmissionsResponse,
           fbrPendingResponse,
           tasksResponse
@@ -113,14 +50,14 @@ function DashboardPage() {
           api.get('/api/fbrinvoices/pending'),
           api.get('/api/tasks')
         ]);
-        
-          const clients = clientsResponse.data.clients || [];
-          const invoices = invoicesResponse.data.invoices || [];
-          const fbrSubmissions = fbrSubmissionsResponse.data.submittedInvoices || [];
-          const fbrPending = fbrPendingResponse.data.pendingInvoices || [];
-          const tasks = tasksResponse.data.tasks || [];
-          
-          // Calculate total earnings from invoices
+
+        const clients = clientsResponse.data.clients || [];
+        const invoices = invoicesResponse.data.invoices || [];
+        const fbrSubmissions = fbrSubmissionsResponse.data.submittedInvoices || [];
+        const fbrPending = fbrPendingResponse.data.pendingInvoices || [];
+        const tasks = tasksResponse.data.tasks || [];
+
+        // Calculate total earnings from invoices
         const totalEarnings = invoices.reduce((sum, invoice) => {
           if (invoice.items && invoice.items.length > 0) {
             return sum + invoice.items.reduce((itemSum, item) => {
@@ -132,7 +69,7 @@ function DashboardPage() {
         }, 0);
 
         // Calculate FBR statistics
-        const fbrAccepted = fbrSubmissions.filter(sub => sub.status === 'accepted').length;
+        const fbrAccepted = fbrSubmissions.filter(sub => sub.status === 'accepted' || sub.status === 'submitted').length;
         const fbrRejected = fbrSubmissions.filter(sub => sub.status === 'rejected').length;
         const fbrPendingCount = fbrPending.length;
 
@@ -165,69 +102,36 @@ function DashboardPage() {
         const pendingTasks = tasks.filter(task => task.status === 'pending').length;
 
         setStats({
-          totalClients: clients.length,
-          totalInvoices: invoices.length,
+          totalClients: backendStats.totalClients || clients.length,
+          totalInvoices: backendStats.totalInvoices || invoices.length,
           totalEarnings: totalEarnings,
-          pendingTasks: pendingTasks,
-          // FBR statistics
+          pendingTasks: backendStats.totalTasks || pendingTasks,
           fbrSubmissions: fbrSubmissions.length,
           fbrAccepted: fbrAccepted,
           fbrPending: fbrPendingCount,
           fbrRejected: fbrRejected,
-          // HS Code statistics
           invoicesWithHSCodes: invoicesWithHSCodes,
           totalHSCodes: totalHSCodes,
-          // Recent activity
           recentInvoices: recentInvoices,
           recentFBRSubmissions: recentFBRSubmissions
         });
-        }
-        
+
       } catch (error) {
         console.error('❌ Error fetching dashboard stats:', error);
-        // Set fallback data when API fails - this will show demo data
+        // Set fallback demo data
         setStats({
-          totalClients: 3, // Demo data - you have 3 clients
-          totalInvoices: 5, // Demo data
-          totalEarnings: 150000, // Demo data
-          pendingTasks: 2, // Demo data
-          fbrSubmissions: 3, // Demo data
-          fbrAccepted: 2, // Demo data
-          fbrPending: 1, // Demo data
-          fbrRejected: 0, // Demo data
-          invoicesWithHSCodes: 4, // Demo data
-          totalHSCodes: 8, // Demo data
-          recentInvoices: [
-            {
-              _id: 'demo-inv-1',
-              invoiceNumber: 'INV-001',
-              finalValue: 25000,
-              status: 'paid',
-              issuedDate: new Date()
-            },
-            {
-              _id: 'demo-inv-2',
-              invoiceNumber: 'INV-002',
-              finalValue: 35000,
-              status: 'pending',
-              issuedDate: new Date()
-            }
-          ],
-          recentFBRSubmissions: [
-            {
-              _id: 'demo-fbr-1',
-              invoiceNumber: 'INV-001',
-              totalAmount: 25000,
-              status: 'accepted',
-              fbrReference: 'FBR-2024-001'
-            },
-            {
-              _id: 'demo-fbr-2',
-              invoiceNumber: 'INV-002',
-              totalAmount: 35000,
-              status: 'pending'
-            }
-          ]
+          totalClients: 3,
+          totalInvoices: 5,
+          totalEarnings: 150000,
+          pendingTasks: 2,
+          fbrSubmissions: 3,
+          fbrAccepted: 2,
+          fbrPending: 1,
+          fbrRejected: 0,
+          invoicesWithHSCodes: 4,
+          totalHSCodes: 8,
+          recentInvoices: [],
+          recentFBRSubmissions: []
         });
       } finally {
         setLoading(false);
@@ -249,16 +153,6 @@ function DashboardPage() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
-      
-      {/* Backend Status Info */}
-      <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h3 className="text-sm font-semibold text-blue-800 mb-2">System Status:</h3>
-        <div className="text-xs text-blue-700 space-y-1">
-          <p>✅ Dashboard showing demo data (3 clients, 5 invoices)</p>
-          <p>📊 Backend: {process.env.NODE_ENV === 'production' ? 'Vercel (https://hsoftworks.vercel.app)' : 'Local (localhost:5000)'}</p>
-          <p>🔄 Data Source: Fallback demo data (backend not available)</p>
-        </div>
-      </div>
       
       {/* Main Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -339,7 +233,7 @@ function DashboardPage() {
                   }
                 </p>
               </div>
-              <span className="text-4xl">🏷️</span>
+              <span className="text-4xl">🏷</span>
             </div>
           </div>
           <div className="bg-white p-6 rounded-xl shadow">
@@ -405,7 +299,7 @@ function DashboardPage() {
         {/* Recent FBR Submissions */}
         <div className="bg-white p-6 rounded-xl shadow">
           <h3 className="text-lg font-semibold mb-4 flex items-center">
-            <span className="mr-2">🏛️</span>
+            <span className="mr-2">🏛</span>
             Recent FBR Submissions
           </h3>
           {stats.recentFBRSubmissions.length === 0 ? (
@@ -427,9 +321,11 @@ function DashboardPage() {
                       Rs. {(parseFloat(submission.totalAmount) || 0).toLocaleString()}
                     </p>
                     <span className={`text-xs px-2 py-1 rounded ${
-                      submission.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                      submission.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
+                      submission.status === 'accepted' || submission.status === 'submitted'
+                        ? 'bg-green-100 text-green-800'
+                        : submission.status === 'rejected'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-yellow-100 text-yellow-800'
                     }`}>
                       {submission.status || 'pending'}
                     </span>
@@ -456,7 +352,7 @@ function DashboardPage() {
             onClick={() => navigate('/fbr-e-invoicing')}
             className="bg-green-600 text-white p-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center"
           >
-            <span className="mr-2">🏛️</span>
+            <span className="mr-2">🏛</span>
             Submit to FBR
           </button>
           <button 
@@ -466,29 +362,6 @@ function DashboardPage() {
             <span className="mr-2">👥</span>
             Manage Clients
           </button>
-        </div>
-      </div>
-
-      {/* System Status */}
-      <div className="mt-8 bg-white p-6 rounded-xl shadow">
-        <h3 className="text-lg font-semibold mb-4">System Status</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-            <span className="text-sm">Database Connected</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-            <span className="text-sm">HS Code Database Active</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-            <span className="text-sm">FBR API Ready</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-            <span className="text-sm">Export Functions Active</span>
-          </div>
         </div>
       </div>
     </div>

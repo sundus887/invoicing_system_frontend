@@ -5,8 +5,8 @@ const API_URL = process.env.NODE_ENV === 'production'
   ? 'https://hsoftworks.vercel.app'  // Your deployed backend URL
   : 'http://localhost:5000';
 
-console.log('🚀 Using API URL:', API_URL);
-console.log('🌍 Environment:', process.env.NODE_ENV);
+console.log(`🚀 Using API URL: ${API_URL}`);
+console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
 
 const api = axios.create({
   baseURL: API_URL, // Fixed: Remove /api from baseURL since endpoints already include it
@@ -48,7 +48,6 @@ api.interceptors.response.use(
     // Handle timeout errors with retry logic
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
       console.log('⏰ Request timed out, retrying...');
-      
       // Retry the request once
       const originalRequest = error.config;
       if (!originalRequest._retry) {
@@ -60,13 +59,11 @@ api.interceptors.response.use(
     // Handle specific multi-tenancy errors
     if (error.response?.status === 403) {
       const errorMessage = error.response.data?.message;
-      
       // Handle seller context errors
       if (errorMessage?.includes('Seller context required') || 
           errorMessage?.includes('Seller settings not found') ||
           errorMessage?.includes('Buyer account not properly linked')) {
         console.error('🔒 Multi-tenancy error:', errorMessage);
-        
         // Optionally redirect to login or show specific error
         if (errorMessage?.includes('Seller settings not found')) {
           // Redirect to seller setup page
@@ -135,7 +132,6 @@ export const retryRequest = async (requestFn, maxRetries = 2) => {
       if (attempt === maxRetries) {
         throw error;
       }
-      
       // Wait before retrying (exponential backoff)
       const delay = Math.pow(2, attempt) * 1000;
       console.log(`🔄 Retry attempt ${attempt}/${maxRetries} in ${delay}ms...`);
