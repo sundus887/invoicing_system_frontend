@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import React, { useState, useEffect, useMemo } from 'react';
+
+import api, { retryRequest } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 function ServicesPage() {
@@ -9,7 +10,10 @@ function ServicesPage() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
+  // Removed manual retryCount logic to avoid prolonged loading states
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Form state
   const [form, setForm] = useState({
@@ -24,7 +28,7 @@ function ServicesPage() {
     hsCode: ''
   });
 
-  // Fetch services with retry logic
+  // Fetch services with controlled retries using retryRequest helper
   const fetchServices = async () => {
     try {
       setLoading(true);
@@ -38,28 +42,19 @@ function ServicesPage() {
 
       console.log('🌐 Fetching services for seller:', sellerId);
       
-      const response = await api.get('/api/services');
+      const response = await retryRequest(() => api.get('/api/services'), 2);
 
       console.log('✅ Backend services response:', response.data);
       
       if (response.data?.success && Array.isArray(response.data.services)) {
         setServices(response.data.services);
-        setRetryCount(0); // Reset retry count on success
+        setPage(1); // reset page on new data
       } else {
         setError('Invalid response format from server.');
       }
     } catch (err) {
       console.error('❌ Error fetching services:', err);
-      setRetryCount(prev => prev + 1);
-      
-      if (retryCount < 2) { // Auto-retry logic
-        setTimeout(() => {
-          console.log(`🔄 Auto-retrying services fetch (attempt ${retryCount + 1})...`);
-          fetchServices();
-        }, 2000);
-      } else {
-        setError('Failed to load services after multiple attempts. Please refresh the page.');
-      }
+      setError('Failed to load services. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -132,16 +127,19 @@ function ServicesPage() {
     fetchServices();
   }, []);
 
+  // Derived pagination data
+  const totalServices = services.length;
+  const totalPages = Math.max(1, Math.ceil(totalServices / pageSize));
+  const paginatedServices = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return services.slice(start, start + pageSize);
+  }, [services, page, pageSize]);
+
   if (loading) {
     return (
       <div className="text-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
         <p className="mt-2 text-gray-600">Loading services...</p>
-        {retryCount > 0 && (
-          <p className="text-sm text-yellow-600 mt-1">
-            Retry attempt {retryCount}/2
-          </p>
-        )}
       </div>
     );
   }
@@ -156,8 +154,9 @@ function ServicesPage() {
       )}
       
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={fetchServices} className="ml-4 bg-red-600 text-white px-3 py-1 rounded text-sm">Retry</button>
         </div>
       )}
 
@@ -375,14 +374,14 @@ function ServicesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {services.length === 0 ? (
+            {totalServices === 0 ? (
               <tr>
                 <td colSpan="8" className="py-8 px-4 text-center text-gray-500">
                   No services found. Create your first service!
                 </td>
               </tr>
             ) : (
-              services.map((service) => (
+              paginatedServices.map((service) => (
                 <tr key={service._id} className="hover:bg-gray-50">
                   <td className="py-3 px-4 text-sm text-gray-900">{service.name}</td>
                   <td className="py-3 px-4 text-sm text-gray-900">{service.type}</td>
@@ -417,6 +416,40 @@ function ServicesPage() {
             )}
           </tbody>
         </table>
+        {/* Pagination Controls */}
+        {totalServices > 0 && (
+          <div className="flex items-center justify-between p-4 border-t bg-white">
+            <div className="text-sm text-gray-600">
+              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalServices)} of {totalServices}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="px-3 py-1 rounded border disabled:opacity-50"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </button>
+              <span className="text-sm">Page {page} / {totalPages}</span>
+              <button
+                className="px-3 py-1 rounded border disabled:opacity-50"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                Next
+              </button>
+              <select
+                className="ml-2 border rounded px-2 py-1 text-sm"
+                value={pageSize}
+                onChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPage(1); }}
+              >
+                {[10, 20, 50, 100].map(size => (
+                  <option key={size} value={size}>{size}/page</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

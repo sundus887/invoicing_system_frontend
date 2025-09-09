@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api, { retryRequest } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -11,6 +11,11 @@ function FbrEInvoicingPage() {
   const [success, setSuccess] = useState(null);
   const [activeTab, setActiveTab] = useState('pending');
   const [retryCount, setRetryCount] = useState(0);
+  // Pagination state per tab
+  const [pendingPage, setPendingPage] = useState(1);
+  const [pendingPageSize, setPendingPageSize] = useState(10);
+  const [submittedPage, setSubmittedPage] = useState(1);
+  const [submittedPageSize, setSubmittedPageSize] = useState(10);
 
   // Fetch pending FBR invoices
   const fetchPendingInvoices = async () => {
@@ -32,6 +37,7 @@ function FbrEInvoicingPage() {
       
       if (response.data.success) {
         setPendingInvoices(response.data.pendingInvoices);
+        setPendingPage(1); // reset page when data changes
         setRetryCount(0);
       } else {
         setError('Failed to load pending FBR invoices.');
@@ -71,6 +77,7 @@ function FbrEInvoicingPage() {
       
       if (response.data.success) {
         setSubmittedInvoices(response.data.submittedInvoices);
+        setSubmittedPage(1); // reset page when data changes
         setRetryCount(0);
       } else {
         setError('Failed to load submitted FBR invoices.');
@@ -124,6 +131,21 @@ function FbrEInvoicingPage() {
       fetchSubmittedInvoices().finally(() => setLoading(false));
     }
   }, [activeTab]);
+
+  // Derived pagination data
+  const totalPending = pendingInvoices.length;
+  const pendingTotalPages = Math.max(1, Math.ceil(totalPending / pendingPageSize));
+  const paginatedPending = useMemo(() => {
+    const start = (pendingPage - 1) * pendingPageSize;
+    return pendingInvoices.slice(start, start + pendingPageSize);
+  }, [pendingInvoices, pendingPage, pendingPageSize]);
+
+  const totalSubmitted = submittedInvoices.length;
+  const submittedTotalPages = Math.max(1, Math.ceil(totalSubmitted / submittedPageSize));
+  const paginatedSubmitted = useMemo(() => {
+    const start = (submittedPage - 1) * submittedPageSize;
+    return submittedInvoices.slice(start, start + submittedPageSize);
+  }, [submittedInvoices, submittedPage, submittedPageSize]);
 
   if (loading) {
     return (
@@ -209,14 +231,14 @@ function FbrEInvoicingPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {pendingInvoices.length === 0 ? (
+              {totalPending === 0 ? (
                 <tr>
                   <td colSpan="6" className="py-8 px-4 text-center text-gray-500">
                     No pending FBR invoices found.
                   </td>
                 </tr>
               ) : (
-                pendingInvoices.map((fbrInvoice) => (
+                paginatedPending.map((fbrInvoice) => (
                   <tr key={fbrInvoice._id} className="hover:bg-gray-50">
                     <td className="py-3 px-4 text-sm text-gray-900">
                       {fbrInvoice.invoiceNumber}
@@ -249,6 +271,40 @@ function FbrEInvoicingPage() {
               )}
               </tbody>
             </table>
+            {/* Pagination Controls for Pending */}
+            {totalPending > 0 && (
+              <div className="flex items-center justify-between p-4 border-t bg-white">
+                <div className="text-sm text-gray-600">
+                  Showing {(pendingPage - 1) * pendingPageSize + 1}–{Math.min(pendingPage * pendingPageSize, totalPending)} of {totalPending}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="px-3 py-1 rounded border disabled:opacity-50"
+                    onClick={() => setPendingPage(p => Math.max(1, p - 1))}
+                    disabled={pendingPage === 1}
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm">Page {pendingPage} / {pendingTotalPages}</span>
+                  <button
+                    className="px-3 py-1 rounded border disabled:opacity-50"
+                    onClick={() => setPendingPage(p => Math.min(pendingTotalPages, p + 1))}
+                    disabled={pendingPage === pendingTotalPages}
+                  >
+                    Next
+                  </button>
+                  <select
+                    className="ml-2 border rounded px-2 py-1 text-sm"
+                    value={pendingPageSize}
+                    onChange={(e) => { setPendingPageSize(parseInt(e.target.value, 10)); setPendingPage(1); }}
+                  >
+                    {[10, 20, 50, 100].map(size => (
+                      <option key={size} value={size}>{size}/page</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
         </div>
       )}
 
@@ -268,14 +324,14 @@ function FbrEInvoicingPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {submittedInvoices.length === 0 ? (
+              {totalSubmitted === 0 ? (
                 <tr>
                   <td colSpan="7" className="py-8 px-4 text-center text-gray-500">
                     No submitted FBR invoices found.
                   </td>
                 </tr>
               ) : (
-                submittedInvoices.map((fbrInvoice) => (
+                paginatedSubmitted.map((fbrInvoice) => (
                   <tr key={fbrInvoice._id} className="hover:bg-gray-50">
                     <td className="py-3 px-4 text-sm text-gray-900">
                       {fbrInvoice.invoiceNumber}
@@ -315,6 +371,40 @@ function FbrEInvoicingPage() {
               )}
             </tbody>
           </table>
+          {/* Pagination Controls for Submitted */}
+          {totalSubmitted > 0 && (
+            <div className="flex items-center justify-between p-4 border-t bg-white">
+              <div className="text-sm text-gray-600">
+                Showing {(submittedPage - 1) * submittedPageSize + 1}–{Math.min(submittedPage * submittedPageSize, totalSubmitted)} of {totalSubmitted}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="px-3 py-1 rounded border disabled:opacity-50"
+                  onClick={() => setSubmittedPage(p => Math.max(1, p - 1))}
+                  disabled={submittedPage === 1}
+                >
+                  Previous
+                </button>
+                <span className="text-sm">Page {submittedPage} / {submittedTotalPages}</span>
+                <button
+                  className="px-3 py-1 rounded border disabled:opacity-50"
+                  onClick={() => setSubmittedPage(p => Math.min(submittedTotalPages, p + 1))}
+                  disabled={submittedPage === submittedTotalPages}
+                >
+                  Next
+                </button>
+                <select
+                  className="ml-2 border rounded px-2 py-1 text-sm"
+                  value={submittedPageSize}
+                  onChange={(e) => { setSubmittedPageSize(parseInt(e.target.value, 10)); setSubmittedPage(1); }}
+                >
+                  {[10, 20, 50, 100].map(size => (
+                    <option key={size} value={size}>{size}/page</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

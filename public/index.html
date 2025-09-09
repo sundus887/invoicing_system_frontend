@@ -9,7 +9,13 @@
       name="description"
       content="Tax Nexus - Professional Invoice Management System"
     />
-          <link rel="apple-touch-icon" href="%PUBLIC_URL%/tax-nexus-logo-color-full-lg.jpg" />
+    <!-- Performance hints: reduce DNS/TLS connection time to API origin -->
+    <link rel="dns-prefetch" href="//hsoftworks.vercel.app" />
+    <link rel="preconnect" href="https://hsoftworks.vercel.app" crossorigin />
+    <!-- During local development, the following helps as well (harmless in prod) -->
+    <link rel="dns-prefetch" href="//localhost" />
+    <link rel="preconnect" href="http://localhost:5000" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/tax-nexus-logo-color-full-lg.jpg" />
     <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/

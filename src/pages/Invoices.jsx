@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
@@ -11,6 +11,9 @@ function InvoicesPage() {
   const [exportLoading, setExportLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   
   // FBR Authentication State
   const [fbrAuthStatus, setFbrAuthStatus] = useState(false);
@@ -86,6 +89,8 @@ function InvoicesPage() {
       
       // Backend now automatically filters by seller
       setInvoices(response.data.invoices || response.data);
+      // Reset to first page when data changes
+      setPage(1);
     } catch (err) {
       console.error('❌ Error fetching invoices:', err);
       setError(err.response?.data?.message || 'Failed to load invoices. Please try again.');
@@ -287,6 +292,14 @@ function InvoicesPage() {
     checkFbrAuthStatus();
     }
   }, [sellerId, isSeller, isAdmin]);
+
+  // Derived pagination data
+  const totalInvoices = invoices.length;
+  const totalPages = Math.max(1, Math.ceil(totalInvoices / pageSize));
+  const paginatedInvoices = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return invoices.slice(start, start + pageSize);
+  }, [invoices, page, pageSize]);
 
   const handleAddInvoice = async (e) => {
     e.preventDefault();
@@ -661,14 +674,14 @@ function InvoicesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {invoices.length === 0 ? (
+            {totalInvoices === 0 ? (
               <tr>
                 <td colSpan="10" className="py-8 px-4 text-center text-gray-500">
                   No invoices found. Create your first FBR invoice!
                 </td>
               </tr>
             ) : (
-              invoices.map((inv) => {
+              paginatedInvoices.map((inv) => {
                 const buyerName = inv.buyerId?.companyName || 'N/A';
                 const items = inv.items?.map(item => item.description || item.product).join(', ') || inv.product || 'N/A';
                 const hsCodes = inv.items?.map(item => item.hsCode || '0000.00.00').join(', ') || '0000.00.00';
@@ -730,6 +743,40 @@ function InvoicesPage() {
             )}
           </tbody>
         </table>
+        {/* Pagination Controls */}
+        {totalInvoices > 0 && (
+          <div className="flex items-center justify-between p-4 border-t bg-white">
+            <div className="text-sm text-gray-600">
+              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalInvoices)} of {totalInvoices}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="px-3 py-1 rounded border disabled:opacity-50"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </button>
+              <span className="text-sm">Page {page} / {totalPages}</span>
+              <button
+                className="px-3 py-1 rounded border disabled:opacity-50"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                Next
+              </button>
+              <select
+                className="ml-2 border rounded px-2 py-1 text-sm"
+                value={pageSize}
+                onChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPage(1); }}
+              >
+                {[10, 20, 50, 100].map(size => (
+                  <option key={size} value={size}>{size}/page</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

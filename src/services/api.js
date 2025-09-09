@@ -5,8 +5,10 @@ const API_URL = process.env.NODE_ENV === 'production'
   ? 'https://hsoftworks.vercel.app'  // Your deployed backend URL
   : 'http://localhost:5000';
 
-console.log('🚀 Using API URL:', API_URL);
-console.log('🌍 Environment:', process.env.NODE_ENV);
+if (process.env.NODE_ENV !== 'production') {
+  console.log('🚀 Using API URL:', API_URL);
+  console.log('🌍 Environment:', process.env.NODE_ENV);
+}
 
 const api = axios.create({
   baseURL: API_URL, // Fixed: Remove /api from baseURL since endpoints already include it
@@ -25,13 +27,17 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`; // Fixed: Use template literal syntax
     }
     
-    console.log(`🌐 Making ${config.method?.toUpperCase()} request to: ${config.url}`);
-    console.log(`   Auth token present: ${!!token}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`🌐 Making ${config.method?.toUpperCase()} request to: ${config.url}`);
+      console.log(`   Auth token present: ${!!token}`);
+    }
     
     return config;
   },
   (error) => {
-    console.error('❌ Request error:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('❌ Request error:', error);
+    }
     return Promise.reject(error);
   }
 );
@@ -39,15 +45,21 @@ api.interceptors.request.use(
 // Add response interceptor for better error handling and multi-tenancy
 api.interceptors.response.use(
   (response) => {
-    console.log(`✅ Response received from: ${response.config.url}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`✅ Response received from: ${response.config.url}`);
+    }
     return response;
   },
   async (error) => {
-    console.error(`❌ Response error from ${error.config?.url}:`, error.response?.status, error.response?.data);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error(`❌ Response error from ${error.config?.url}:`, error.response?.status, error.response?.data);
+    }
     
     // Handle timeout errors with retry logic
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-      console.log('⏰ Request timed out, retrying...');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('⏰ Request timed out, retrying...');
+      }
       
       // Retry the request once
       const originalRequest = error.config;
@@ -65,7 +77,9 @@ api.interceptors.response.use(
       if (errorMessage?.includes('Seller context required') || 
           errorMessage?.includes('Seller settings not found') ||
           errorMessage?.includes('Buyer account not properly linked')) {
-        console.error('🔒 Multi-tenancy error:', errorMessage);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('🔒 Multi-tenancy error:', errorMessage);
+        }
         
         // Optionally redirect to login or show specific error
         if (errorMessage?.includes('Seller settings not found')) {
@@ -81,7 +95,9 @@ api.interceptors.response.use(
     
     // Handle authentication errors
     if (error.response?.status === 401) {
-      console.error('🔐 Authentication error - redirecting to login');
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('🔐 Authentication error - redirecting to login');
+      }
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
@@ -90,7 +106,9 @@ api.interceptors.response.use(
     if (error.response?.status === 500) {
       const errorMessage = error.response.data?.message;
       if (errorMessage?.includes('timed out') || errorMessage?.includes('buffering')) {
-        console.error('⏰ Server timeout error - this should be resolved with the backend fixes');
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('⏰ Server timeout error - this should be resolved with the backend fixes');
+        }
         // You can show a user-friendly message here
       }
     }

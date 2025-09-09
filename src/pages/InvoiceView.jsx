@@ -93,6 +93,11 @@ const InvoiceView = ({ invoiceId }) => {
                     src={`data:image/png;base64,${fbrData.qrCode}`} 
                     alt="FBR QR Code"
                     className="w-32 h-32"
+                    width="128"
+                    height="128"
+                    loading="lazy"
+                    decoding="async"
+                    fetchpriority="low"
                   />
                 </div>
               </div>
