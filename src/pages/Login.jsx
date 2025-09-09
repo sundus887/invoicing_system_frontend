@@ -24,6 +24,12 @@ const LoginPage = () => {
     }
   }, [user, navigate, location]);
 
+  // Warm up the next likely route (dashboard) so it opens instantly after login
+  useEffect(() => {
+    // Hint webpack to prefetch the dashboard chunk while idle
+    import(/* webpackPrefetch: true, webpackChunkName: "page-dashboard" */ '../pages/Dashboard').catch(() => {});
+  }, []);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -86,13 +92,18 @@ const LoginPage = () => {
         <div>
                      <div className="flex flex-col items-center">
              <div className="mb-6">
-               <img 
-                 src="/loginlogo.jpg" 
-                 alt="Tax Nexus Logo" 
-                 className="w-64 h-64 object-cover rounded-lg shadow-lg"
-                 style={{ objectPosition: 'center' }}
-               />
-             </div>
+              <img 
+                src="/loginlogo.jpg" 
+                alt="Tax Nexus Logo" 
+                className="w-64 h-64 object-cover rounded-lg shadow-lg"
+                style={{ objectPosition: 'center' }}
+                width="256"
+                height="256"
+                decoding="async"
+                fetchpriority="high"
+                loading="eager"
+              />
+            </div>
              <p className="text-gray-600 text-lg font-medium">Tax Consulting Platform</p>
            </div>
         </div>

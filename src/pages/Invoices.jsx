@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
@@ -11,7 +11,10 @@ function InvoicesPage() {
   const [exportLoading, setExportLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  
   // FBR Submission State
   const [fbrSubmitting, setFbrSubmitting] = useState({});
   const [fbrResult, setFbrResult] = useState({});
@@ -84,6 +87,8 @@ function InvoicesPage() {
 
       const response = await api.get('/api/invoices');
       setInvoices(response.data.invoices || response.data);
+      // Reset to first page when data changes
+      setPage(1);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load invoices. Please try again.');
     } finally {
@@ -300,7 +305,104 @@ function InvoicesPage() {
     // eslint-disable-next-line
   }, [sellerId, isSeller, isAdmin]);
 
-  // ... (rest of your form logic and handlers remain unchanged)
+  // Derived pagination data
+  const totalInvoices = invoices.length;
+  const totalPages = Math.max(1, Math.ceil(totalInvoices / pageSize));
+  const paginatedInvoices = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return invoices.slice(start, start + pageSize);
+  }, [invoices, page, pageSize]);
+
+  const handleAddInvoice = async (e) => {
+    e.preventDefault();
+    
+    // Check permissions
+    if (!isSeller() && !isAdmin()) {
+      setError('Only sellers can create invoices');
+      return;
+    }
+    
+    if (!fbrAuthStatus) {
+      setError('Please authenticate with FBR first in Seller Settings');
+      return;
+    }
+
+    if (!form.buyerId) {
+      setError('Please select a buyer');
+      return;
+    }
+
+    if (form.items.length === 0 || !form.items[0].description) {
+      setError('Please add at least one item with description');
+      return;
+    }
+
+    try {
+      console.log('   Submitting invoice with seller context:', sellerId);
+      
+      // Create invoice with HS Codes - sellerId automatically assigned by backend
+      const invoiceData = {
+        buyerId: form.buyerId,
+        items: form.items.map(item => ({
+          ...item,
+          hsCode: item.hsCode || '9983.99.00', // Ensure HS Code is included
+          product: item.description, // Map description to product for backend
+        })),
+        totalAmount: form.totalAmount,
+        salesTax: form.salesTax,
+        extraTax: form.extraTax,
+        discount: form.discount,
+        finalValue: form.finalValue,
+        issuedDate: form.issuedDate,
+        status: form.status
+      };
+
+      const response = await api.post('/api/invoices', invoiceData);
+      console.log('✅ Invoice created successfully:', response.data);
+      
+      if (response.data.success) {
+        // Submit to FBR
+        const fbrResponse = await api.post('/api/fbrinvoices/create-from-invoice', {
+          invoiceNumber: response.data.invoice.invoiceNumber,
+          sandbox: true
+        });
+
+        if (fbrResponse.data.success) {
+          setSuccess('Invoice created and submitted to FBR successfully!');
+          setShowForm(false);
+          resetForm();
+          await fetchInvoices();
+        } else {
+          setError('Invoice created but FBR submission failed');
+        }
+      }
+    } catch (err) {
+      console.error('❌ Error adding invoice:', err);
+      setError(err.response?.data?.error || 'Failed to add invoice. Please try again.');
+    }
+  };
+
+  const resetForm = () => {
+    setForm({
+      buyerId: "",
+      items: [{
+        description: "",
+        quantity: 1,
+        unitPrice: 0,
+        totalValue: 0,
+        salesTax: 0,
+        discount: 0,
+        hsCode: "", // Reset HS Code field
+      }],
+      totalAmount: 0,
+      salesTax: 0,
+      extraTax: 0,
+      discount: 0,
+      finalValue: 0,
+      issuedDate: new Date().toISOString().split('T')[0],
+      status: "pending"
+    });
+  };
 
   // Show loading state
   if (loading) {
@@ -422,14 +524,14 @@ function InvoicesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {invoices.length === 0 ? (
+            {totalInvoices === 0 ? (
               <tr>
                 <td colSpan="10" className="py-8 px-4 text-center text-gray-500">
                   No invoices found. Create your first FBR invoice!
                 </td>
               </tr>
             ) : (
-              invoices.map((inv) => {
+              paginatedInvoices.map((inv) => {
                 const buyerName = inv.buyerId?.companyName || 'N/A';
                 const items = inv.items?.map(item => item.description || item.product).join(', ') || inv.product || 'N/A';
                 const hsCodes = inv.items?.map(item => item.hsCode || '0000.00.00').join(', ') || '0000.00.00';
@@ -508,6 +610,40 @@ function InvoicesPage() {
             )}
           </tbody>
         </table>
+        {/* Pagination Controls */}
+        {totalInvoices > 0 && (
+          <div className="flex items-center justify-between p-4 border-t bg-white">
+            <div className="text-sm text-gray-600">
+              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalInvoices)} of {totalInvoices}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="px-3 py-1 rounded border disabled:opacity-50"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </button>
+              <span className="text-sm">Page {page} / {totalPages}</span>
+              <button
+                className="px-3 py-1 rounded border disabled:opacity-50"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                Next
+              </button>
+              <select
+                className="ml-2 border rounded px-2 py-1 text-sm"
+                value={pageSize}
+                onChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPage(1); }}
+              >
+                {[10, 20, 50, 100].map(size => (
+                  <option key={size} value={size}>{size}/page</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

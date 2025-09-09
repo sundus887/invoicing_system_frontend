@@ -13,6 +13,11 @@ const AppSidebar = () => {
              src="/logo.jpg" 
              alt="Tax Nexus Logo" 
              className="w-16 h-16 object-cover rounded-lg shadow-md"
+             width="64"
+             height="64"
+             loading="lazy"
+             decoding="async"
+             fetchpriority="low"
            />
          </div>
          <div className="text-center">
