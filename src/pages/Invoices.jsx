@@ -11,18 +11,13 @@ function InvoicesPage() {
   const [exportLoading, setExportLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-<<<<<<< HEAD
   // Pagination state
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  
-=======
 
   // FBR Submission State
   const [fbrSubmitting, setFbrSubmitting] = useState({});
   const [fbrResult, setFbrResult] = useState({});
-
->>>>>>> origin/main
   // FBR Authentication State
   const [fbrAuthStatus, setFbrAuthStatus] = useState(false);
 
@@ -309,7 +304,6 @@ function InvoicesPage() {
     // eslint-disable-next-line
   }, [sellerId, isSeller, isAdmin]);
 
-<<<<<<< HEAD
   // Derived pagination data
   const totalInvoices = invoices.length;
   const totalPages = Math.max(1, Math.ceil(totalInvoices / pageSize));
@@ -408,9 +402,6 @@ function InvoicesPage() {
       status: "pending"
     });
   };
-=======
-  // ... (rest of your form logic and handlers remain unchanged)
->>>>>>> origin/main
 
   // Show loading state
   if (loading) {

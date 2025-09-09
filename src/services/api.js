@@ -5,15 +5,10 @@ const API_URL = process.env.NODE_ENV === 'production'
   ? 'https://hsoftworks.vercel.app'  // Your deployed backend URL
   : 'http://localhost:5000';
 
-<<<<<<< HEAD
 if (process.env.NODE_ENV !== 'production') {
   console.log('🚀 Using API URL:', API_URL);
   console.log('🌍 Environment:', process.env.NODE_ENV);
 }
-=======
-console.log(`🚀 Using API URL: ${API_URL}`);
-console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
->>>>>>> origin/main
 
 const api = axios.create({
   baseURL: API_URL, // Fixed: Remove /api from baseURL since endpoints already include it
@@ -62,14 +57,9 @@ api.interceptors.response.use(
     
     // Handle timeout errors with retry logic
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-<<<<<<< HEAD
       if (process.env.NODE_ENV !== 'production') {
         console.log('⏰ Request timed out, retrying...');
       }
-      
-=======
-      console.log('⏰ Request timed out, retrying...');
->>>>>>> origin/main
       // Retry the request once
       const originalRequest = error.config;
       if (!originalRequest._retry) {
@@ -85,14 +75,9 @@ api.interceptors.response.use(
       if (errorMessage?.includes('Seller context required') || 
           errorMessage?.includes('Seller settings not found') ||
           errorMessage?.includes('Buyer account not properly linked')) {
-<<<<<<< HEAD
         if (process.env.NODE_ENV !== 'production') {
           console.error('🔒 Multi-tenancy error:', errorMessage);
         }
-        
-=======
-        console.error('🔒 Multi-tenancy error:', errorMessage);
->>>>>>> origin/main
         // Optionally redirect to login or show specific error
         if (errorMessage?.includes('Seller settings not found')) {
           // Redirect to seller setup page
