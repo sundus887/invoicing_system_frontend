@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 // If you use a context for auth/seller info, import it here
 // import { useAuth } from '../contexts/AuthContext';
@@ -26,7 +26,7 @@ function FbrSettingsPage() {
       setFetching(true);
       setError('');
       try {
-        const res = await axios.get('/api/seller-settings');
+        const res = await api.get('/api/seller-settings');
         const seller = res.data.sellerSettings.find(s => s.sellerId === sellerId);
         if (seller) {
           setForm({
@@ -54,7 +54,7 @@ function FbrSettingsPage() {
     setMessage('');
     setError('');
     try {
-      await axios.put('/api/seller-settings/fbr', {
+      await api.put('/api/seller-settings/fbr', {
         sellerId,
         ...form
       });
