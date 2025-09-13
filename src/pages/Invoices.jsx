@@ -297,9 +297,14 @@ function InvoicesPage() {
 
   useEffect(() => {
     if (isSeller() || isAdmin()) {
-      fetchInvoices();
-      fetchBuyers();
-      checkFbrAuthStatus();
+      // Run data fetches in parallel to reduce time-to-data
+      Promise.all([
+        fetchInvoices(),
+        fetchBuyers(),
+        checkFbrAuthStatus(),
+      ]).catch(() => {
+        // Errors are already handled within each function
+      });
     }
     // eslint-disable-next-line
   }, [sellerId, isSeller, isAdmin]);

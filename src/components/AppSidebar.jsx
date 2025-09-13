@@ -1,8 +1,41 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 const AppSidebar = () => {
   const location = useLocation();
+
+  const prefetchPage = useCallback((key) => {
+    try {
+      switch (key) {
+        case 'dashboard':
+          import(/* webpackPrefetch: true, webpackChunkName: "page-dashboard" */ '../pages/Dashboard');
+          break;
+        case 'clients':
+          import(/* webpackPrefetch: true, webpackChunkName: "page-clients" */ '../pages/Clients');
+          break;
+        case 'sellers':
+          import(/* webpackPrefetch: true, webpackChunkName: "page-seller-config" */ '../pages/SellerConfigurationPage');
+          break;
+        case 'services':
+          import(/* webpackPrefetch: true, webpackChunkName: "page-services" */ '../pages/Services');
+          break;
+        case 'invoices':
+          import(/* webpackPrefetch: true, webpackChunkName: "page-invoices" */ '../pages/Invoices');
+          break;
+        case 'fbr-e-invoicing':
+          import(/* webpackPrefetch: true, webpackChunkName: "page-fbr-e-invoicing" */ '../pages/FbrEInvoicing');
+          break;
+        case 'user-roles':
+          import(/* webpackPrefetch: true, webpackChunkName: "page-user-roles" */ '../pages/UserRoles');
+          break;
+        case 'export':
+          import(/* webpackPrefetch: true, webpackChunkName: "page-export" */ '../pages/ExportPage');
+          break;
+        default:
+          break;
+      }
+    } catch {}
+  }, []);
 
   return (
     <div className="w-64 bg-white shadow-lg min-h-screen">
@@ -30,6 +63,7 @@ const AppSidebar = () => {
       <nav className="p-4 space-y-2">
         <Link 
           to="/dashboard" 
+          onMouseEnter={() => prefetchPage('dashboard')}
           className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
             location.pathname === "/dashboard" 
               ? "bg-black text-white" 
@@ -44,6 +78,7 @@ const AppSidebar = () => {
 
         <Link 
           to="/clients" 
+          onMouseEnter={() => prefetchPage('clients')}
           className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
             location.pathname === "/clients" 
               ? "bg-black text-white" 
@@ -58,6 +93,7 @@ const AppSidebar = () => {
 
         <Link 
           to="/sellers" 
+          onMouseEnter={() => prefetchPage('sellers')}
           className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
             location.pathname === "/sellers" 
               ? "bg-black text-white" 
@@ -72,6 +108,7 @@ const AppSidebar = () => {
 
         <Link 
           to="/services" 
+          onMouseEnter={() => prefetchPage('services')}
           className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
             location.pathname === "/services" 
               ? "bg-black text-white" 
@@ -86,6 +123,7 @@ const AppSidebar = () => {
 
         <Link 
           to="/invoices" 
+          onMouseEnter={() => prefetchPage('invoices')}
           className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
             location.pathname === "/invoices" 
               ? "bg-black text-white" 
@@ -100,6 +138,7 @@ const AppSidebar = () => {
 
         <Link 
           to="/fbr-e-invoicing" 
+          onMouseEnter={() => prefetchPage('fbr-e-invoicing')}
           className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
             location.pathname === "/fbr-e-invoicing" 
               ? "bg-black text-white" 
@@ -116,6 +155,7 @@ const AppSidebar = () => {
 
         <Link 
           to="/user-roles" 
+          onMouseEnter={() => prefetchPage('user-roles')}
           className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
             location.pathname === "/user-roles" 
               ? "bg-black text-white" 
@@ -130,6 +170,7 @@ const AppSidebar = () => {
 
         <Link 
           to="/export" 
+          onMouseEnter={() => prefetchPage('export')}
           className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
             location.pathname === "/export" 
               ? "bg-black text-white" 

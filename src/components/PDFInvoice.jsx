@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf';
+// Defer loading of jspdf until actually needed to reduce initial bundle size
 
 // Function to generate QR code data URL with specific invoice information
 const generateQRCodeDataURL = async (invoice, buyer, seller) => {
@@ -42,6 +42,8 @@ const generatePDFInvoice = async (invoice, buyer, seller) => {
     // Generate QR code with specific invoice data
     const qrCodeDataURL = await generateQRCodeDataURL(invoice, buyer, seller);
     
+    // Dynamically import jsPDF only when needed
+    const { default: jsPDF } = await import('jspdf');
     // Create new PDF document with proper margins
     const doc = new jsPDF();
     
