@@ -1,10 +1,14 @@
 // src/services/auth.js
+import { setAuthToken } from './api';
 
 // Login function (replace with real API call)
 export const login = (username, password) => {
   // Demo: sirf admin/admin ko allow karta hai
   if (username === "admin" && password === "admin") {
     localStorage.setItem("user", JSON.stringify({ username }));
+    // Set a dummy token for demo and sync axios header
+    localStorage.setItem('token', 'dummy-token');
+    setAuthToken('dummy-token');
     return true;
   }
   return false;
@@ -22,8 +26,14 @@ export const loginWithEmail = (email, password) => {
     };
     
     try {
-      localStorage.setItem('token', 'dummy-token');
+      // Persist user and token
       localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', 'dummy-token');
+      setAuthToken('dummy-token');
+      // Also persist sellerId for pages that read it directly
+      if (userData.sellerId) {
+        localStorage.setItem('sellerId', userData.sellerId);
+      }
       return true;
     } catch (error) {
       console.error('Error saving to localStorage:', error);
@@ -41,8 +51,14 @@ export const loginWithEmail = (email, password) => {
     };
     
     try {
-      localStorage.setItem('token', 'dummy-token');
+      // Persist user and token
       localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', 'dummy-token');
+      setAuthToken('dummy-token');
+      // Also persist sellerId for pages that read it directly
+      if (userData.sellerId) {
+        localStorage.setItem('sellerId', userData.sellerId);
+      }
       return true;
     } catch (error) {
       console.error('Error saving to localStorage:', error);
@@ -57,6 +73,7 @@ export const loginWithEmail = (email, password) => {
 export const logout = () => {
   localStorage.removeItem("user");
   localStorage.removeItem("token");
+  localStorage.removeItem('sellerId');
 };
 
 // Get current user

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { loginWithEmail, getCurrentUser, isAuthenticated } from '../services/auth';
+import { setAuthToken, clearAuthToken } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -28,10 +29,15 @@ export const AuthProvider = ({ children }) => {
             setUser(userData);
             setSellerId(userData.sellerId);
             setUserRole(userData.role);
+            // Ensure axios has the Authorization header after refresh
+            const token = localStorage.getItem('token');
+            if (token) setAuthToken(token);
           } else {
             // Clear invalid data
             localStorage.removeItem('token');
             localStorage.removeItem('user');
+            localStorage.removeItem('sellerId');
+            clearAuthToken();
             setUser(null);
             setSellerId(null);
             setUserRole(null);
@@ -42,6 +48,8 @@ export const AuthProvider = ({ children }) => {
         // Clear invalid data
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('sellerId');
+        clearAuthToken();
         setUser(null);
         setSellerId(null);
         setUserRole(null);
@@ -86,6 +94,8 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('sellerId');
+    clearAuthToken();
     setUser(null);
     setSellerId(null);
     setUserRole(null);

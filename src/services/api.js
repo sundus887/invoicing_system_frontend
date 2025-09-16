@@ -1,9 +1,13 @@
 import axios from 'axios';
 
-// Use deployed backend for production, local for development
-const API_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://hsoftworks.vercel.app'  // Your deployed backend URL
-  : 'http://localhost:5000';
+// Prefer environment variable, fall back to existing defaults
+// Set REACT_APP_API_URL in your environment (Vercel project settings) to override
+const envApiUrl = process.env.REACT_APP_API_URL;
+const API_URL = envApiUrl && envApiUrl.trim().length > 0
+  ? envApiUrl.trim().replace(/\/$/, '') // remove trailing slash if any
+  : (process.env.NODE_ENV === 'production'
+      ? 'https://hsoftworks.vercel.app' // Deployed backend URL
+      : 'http://localhost:5000');
 
 if (process.env.NODE_ENV !== 'production') {
   console.log('🚀 Using API URL:', API_URL);
@@ -11,7 +15,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const api = axios.create({
-  baseURL: API_URL, // Fixed: Remove /api from baseURL since endpoints already include it
+  baseURL: API_URL, // Endpoints below include '/api/...'
   timeout: 15000, // Increased timeout for production
   headers: {
     'Content-Type': 'application/json',
