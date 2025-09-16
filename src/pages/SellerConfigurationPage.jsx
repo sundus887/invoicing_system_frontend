@@ -13,7 +13,6 @@ const SellerConfigurationPage = () => {
   const [sellerSettings, setSellerSettings] = useState({
     companyName: '',
     sellerNTN: '',
-    sellerSTRN: '',
     address: '',
     phone: ''
   });
@@ -25,7 +24,6 @@ const SellerConfigurationPage = () => {
     apiUrl: 'https://iris.fbr.gov.pk/api/v1',
     environment: 'sandbox',
     sellerNTN: '',
-    sellerSTRN: '',
     businessName: ''
   });
 
@@ -54,7 +52,6 @@ const SellerConfigurationPage = () => {
           setSellerSettings({
             companyName: latestSettings.companyName || '',
             sellerNTN: latestSettings.sellerNTN || '',
-            sellerSTRN: latestSettings.sellerSTRN || '',
             address: latestSettings.address || '',
             phone: latestSettings.phone || ''
           });
@@ -74,7 +71,6 @@ const SellerConfigurationPage = () => {
             apiUrl: fbrResponse.data.apiUrl || 'https://iris.fbr.gov.pk/api/v1',
             environment: fbrResponse.data.environment || 'sandbox',
             sellerNTN: fbrResponse.data.sellerNTN || '',
-            sellerSTRN: fbrResponse.data.sellerSTRN || '',
             businessName: fbrResponse.data.businessName || ''
           });
         }
@@ -173,7 +169,6 @@ const SellerConfigurationPage = () => {
         clientId: fbrSettings.clientId,
         clientSecret: fbrSettings.clientSecret,
         sellerNTN: fbrSettings.sellerNTN,
-        sellerSTRN: fbrSettings.sellerSTRN,
         businessName: fbrSettings.businessName,
         environment: fbrSettings.environment
       };
@@ -350,18 +345,9 @@ const SellerConfigurationPage = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Seller STRN *
+                    
                   </label>
-                  <input
-                    type="text"
-                    value={sellerSettings.sellerSTRN}
-                    onChange={(e) => handleSellerChange('sellerSTRN', e.target.value)}
-                    disabled={!isEditing}
-                    className={`w-full px-3 py-2 border rounded-md ${
-                      isEditing ? 'border-gray-300 focus:border-blue-500' : 'border-gray-200 bg-gray-50'
-                    }`}
-                    required
-                  />
+                  {/* Seller STRN field removed as per requirement */}
                 </div>
 
                 <div>
@@ -496,7 +482,7 @@ const SellerConfigurationPage = () => {
       <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h3 className="text-sm font-medium text-blue-900 mb-2">How FBR Integration Works</h3>
         <div className="text-sm text-blue-800 space-y-1">
-          <p>• <strong>Seller Details:</strong> These are your client's business information (NTN, STRN, address) - stored locally for invoice display</p>
+          <p>• <strong>Seller Details:</strong> These are your client's business information (NTN, address) - stored locally for invoice display</p>
           <p>• <strong>FBR API Credentials:</strong> Your client's FBR API credentials (Client ID & Secret) - used for authentication</p>
           <p>• <strong>Authentication:</strong> When you click "Login to FBR", the system authenticates with FBR using your client's credentials</p>
           <p>• <strong>Invoice Creation:</strong> Once authenticated, you can create invoices that will be automatically submitted to FBR</p>
