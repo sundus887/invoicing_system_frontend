@@ -96,11 +96,17 @@ api.interceptors.response.use(
     
     // Handle authentication errors
     if (error.response?.status === 401) {
+      const url = error.config?.url || '';
+      const isAuthEndpoint = url.includes('/api/auth');
       if (process.env.NODE_ENV !== 'production') {
-        console.error('🔐 Authentication error - redirecting to login');
+        console.error(`🔐 401 from ${url}. isAuthEndpoint=${isAuthEndpoint}`);
       }
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Only clear token and redirect for actual auth endpoints to avoid loops
+      if (isAuthEndpoint) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
+      // For non-auth endpoints, keep token and let the caller handle gracefully
     }
     
     // Handle 500 server errors (timeout issues)
