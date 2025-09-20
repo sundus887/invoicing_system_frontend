@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
 const SellerConfigurationPage = () => {
-  const [isEditing, setIsEditing] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fbrLoading, setFbrLoading] = useState(false);
@@ -133,7 +133,8 @@ const SellerConfigurationPage = () => {
       await api.post('/api/fbr-api-settings', fbrSettings);
 
       setSuccess('Configuration saved successfully!');
-      
+      setIsEditing(false);
+
       // Reload data to get updated status
       await loadData();
 
