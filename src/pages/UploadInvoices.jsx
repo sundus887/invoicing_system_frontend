@@ -62,7 +62,7 @@ function UploadInvoices() {
 
   const downloadTemplate = async () => {
     try {
-      if (!sellerId) return setErrors(['Missing seller/company id']);
+      if (!sellerId) return setErrors(['Missing seller/company id. Please relogin or set up seller configuration.']);
       const res = await api.get(`/api/company/${sellerId}/template`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement('a');
@@ -74,7 +74,24 @@ function UploadInvoices() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Template download error', err);
-      setErrors([err.response?.data?.message || 'Failed to download template']);
+      // Try to extract a human-readable error message even if response is a Blob
+      const fallback = 'Failed to download template';
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          // Attempt to parse JSON error
+          try {
+            const json = JSON.parse(text);
+            setErrors([json.message || fallback]);
+          } catch (_) {
+            setErrors([text || fallback]);
+          }
+        } catch (_) {
+          setErrors([fallback]);
+        }
+      } else {
+        setErrors([err.response?.data?.message || fallback]);
+      }
     }
   };
 
@@ -142,7 +159,10 @@ function UploadInvoices() {
           <div className="text-xs uppercase text-gray-500">Step 1</div>
           <div className="font-semibold">Download Template</div>
           <p className="text-sm text-gray-600 mt-1">Company-tailored Excel with required columns.</p>
-          <button onClick={downloadTemplate} className="mt-3 px-4 py-2 bg-gray-900 text-white rounded">Download Excel Template</button>
+          <button onClick={downloadTemplate} disabled={!sellerId} className="mt-3 px-4 py-2 bg-gray-900 text-white rounded disabled:opacity-50">Download Excel Template</button>
+          {!sellerId && (
+            <div className="text-xs text-orange-600 mt-2">Seller/Company ID missing. Please login or configure seller details first.</div>
+          )}
         </div>
         <div className="bg-white rounded-lg border p-4">
           <div className="text-xs uppercase text-gray-500">Step 2</div>
