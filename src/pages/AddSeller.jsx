@@ -11,8 +11,6 @@ const AddSeller = () => {
     sellerSTRN: "",
     phone: "",
     address: "",
-    fbrClientId: "",
-    fbrClientSecret: "",
     environment: "sandbox"
   });
   
@@ -304,37 +302,6 @@ const AddSeller = () => {
             <h4 className="text-md font-semibold mb-3 text-gray-800">FBR API Credentials</h4>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              FBR Client ID (Optional)
-            </label>
-            <input
-              type="text"
-              value={sellerConfig.fbrClientId}
-              onChange={e => handleInputChange('fbrClientId', e.target.value)}
-              className={`w-full border p-2 rounded ${
-                isEditing ? 'bg-white' : 'bg-gray-50'
-              }`}
-              readOnly={!isEditing}
-              placeholder="If blank, backend will use server-stored credentials"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              FBR Client Secret (Optional)
-            </label>
-            <input
-              type="password"
-              value={sellerConfig.fbrClientSecret}
-              onChange={e => handleInputChange('fbrClientSecret', e.target.value)}
-              className={`w-full border p-2 rounded ${
-                isEditing ? 'bg-white' : 'bg-gray-50'
-              }`}
-              readOnly={!isEditing}
-              placeholder="Leave empty to use server-stored secret"
-            />
-          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
