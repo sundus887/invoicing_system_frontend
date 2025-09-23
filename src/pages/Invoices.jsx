@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
@@ -477,6 +478,12 @@ function InvoicesPage() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">FBR Invoices</h2>
         <div className="flex gap-2">
+          <Link
+            to="/upload"
+            className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-900 disabled:opacity-50 flex items-center gap-2"
+          >
+            ⬆ Upload Invoices
+          </Link>
           <button 
             onClick={handleExportExcel}
             disabled={exportLoading || invoices.length === 0}

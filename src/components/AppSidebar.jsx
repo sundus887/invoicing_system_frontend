@@ -31,6 +31,9 @@ const AppSidebar = () => {
         case 'export':
           import(/* webpackPrefetch: true, webpackChunkName: "page-export" */ '../pages/ExportPage');
           break;
+        case 'upload':
+          import(/* webpackPrefetch: true, webpackChunkName: "page-upload" */ '../pages/UploadInvoices');
+          break;
         default:
           break;
       }
@@ -181,6 +184,21 @@ const AppSidebar = () => {
             <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
           </svg>
           Export Data
+        </Link>
+
+        <Link 
+          to="/upload" 
+          onMouseEnter={() => prefetchPage('upload')}
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${
+            location.pathname === "/upload" 
+              ? "bg-black text-white" 
+              : "text-gray-700 hover:bg-gray-100"
+          }`}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M5 20h14v-2H5v2zm7-18L5.33 9h3.84v4h4.66V9h3.84L12 2z"/>
+          </svg>
+          Upload Invoices
         </Link>
       </nav>
     </div>
