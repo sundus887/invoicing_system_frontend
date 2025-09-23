@@ -29,6 +29,25 @@ function UploadInvoices() {
   const [uploadId, setUploadId] = useState(null); // optional backend correlation id
   const [dragOver, setDragOver] = useState(false);
 
+  // Helper: generate a lightweight CSV template locally (no extra deps)
+  const downloadCsvTemplate = () => {
+    try {
+      const headers = columnsHelp.map(h => '"' + h.replace(/"/g, '""') + '"').join(',');
+      const csvContent = "\uFEFF" + headers + "\r\n"; // BOM for Excel compatibility
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'invoice-template.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('CSV template download failed', e);
+    }
+  };
+
   const handleFileChange = (e) => {
     setFile(e.target.files?.[0] || null);
     setErrors([]);
@@ -93,6 +112,9 @@ function UploadInvoices() {
       } else {
         setErrors([err.response?.data?.message || fallback]);
       }
+      // Fallback: provide a client-side CSV template instantly so user is not blocked
+      downloadCsvTemplate();
+      setSuccess('Backend template not available. A CSV template has been downloaded instead. You can upload CSV or Excel.');
     }
   };
 
@@ -177,7 +199,10 @@ function UploadInvoices() {
           <div className="text-xs uppercase text-gray-500">Step 1</div>
           <div className="font-semibold">Download Template</div>
           <p className="text-sm text-gray-600 mt-1">Company-tailored Excel with required columns.</p>
-          <button onClick={downloadTemplate} disabled={!sellerId} className="mt-3 px-4 py-2 bg-gray-900 text-white rounded disabled:opacity-50">Download Excel Template</button>
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            <button onClick={downloadTemplate} disabled={!sellerId} className="px-4 py-2 bg-gray-900 text-white rounded disabled:opacity-50">Download Excel Template</button>
+            <button type="button" onClick={downloadCsvTemplate} className="text-sm text-blue-700 hover:underline">Download CSV Template</button>
+          </div>
           {!sellerId && (
             <div className="text-xs text-orange-600 mt-2">Seller/Company ID missing. Please login or configure seller details first.</div>
           )}
