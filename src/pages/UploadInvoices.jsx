@@ -27,12 +27,37 @@ function UploadInvoices() {
   const [serverReport, setServerReport] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadId, setUploadId] = useState(null); // optional backend correlation id
+  const [dragOver, setDragOver] = useState(false);
 
   const handleFileChange = (e) => {
     setFile(e.target.files?.[0] || null);
     setErrors([]);
     setSuccess(null);
     setServerReport(null);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    const f = e.dataTransfer?.files?.[0];
+    if (!f) return;
+    setFile(f);
+    setErrors([]);
+    setSuccess(null);
+    setServerReport(null);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
   };
 
   const downloadTemplate = async () => {
@@ -106,18 +131,61 @@ function UploadInvoices() {
 
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Upload Invoices (Excel)</h2>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold">Upload Invoices</h2>
+        <p className="text-gray-600">Download the template, fill it, then upload to preview and submit to FBR.</p>
+      </div>
 
-      <div className="bg-white p-4 rounded shadow mb-4">
-        <p className="text-sm text-gray-700 mb-2">Template columns (first row as headers):</p>
-        <div className="text-xs bg-gray-50 border rounded p-3 mb-3">
-          {columnsHelp.join(' | ')}
+      {/* Stepper */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white rounded-lg border p-4">
+          <div className="text-xs uppercase text-gray-500">Step 1</div>
+          <div className="font-semibold">Download Template</div>
+          <p className="text-sm text-gray-600 mt-1">Company-tailored Excel with required columns.</p>
+          <button onClick={downloadTemplate} className="mt-3 px-4 py-2 bg-gray-900 text-white rounded">Download Excel Template</button>
         </div>
+        <div className="bg-white rounded-lg border p-4">
+          <div className="text-xs uppercase text-gray-500">Step 2</div>
+          <div className="font-semibold">Upload & Preview</div>
+          <p className="text-sm text-gray-600 mt-1">Drag and drop or choose your filled file.</p>
+          <div
+            className={`mt-3 border-2 border-dashed rounded-lg p-6 text-center transition ${dragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'}`}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+          >
+            <div className="text-sm text-gray-700">Drop .xlsx here or</div>
+            <label className="inline-block mt-2 px-4 py-2 bg-white border rounded cursor-pointer hover:bg-gray-100">
+              Choose File
+              <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
+            </label>
+            {file && (
+              <div className="mt-2 text-xs text-gray-600">Selected: {file.name}</div>
+            )}
+          </div>
+          <button onClick={uploadForPreview} disabled={!file || uploading} className="mt-3 w-full px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50">
+            {uploading ? 'Uploading...' : 'Upload & Preview'}
+          </button>
+        </div>
+        <div className="bg-white rounded-lg border p-4">
+          <div className="text-xs uppercase text-gray-500">Step 3</div>
+          <div className="font-semibold">Submit to System / FBR</div>
+          <p className="text-sm text-gray-600 mt-1">Review the preview, then submit valid rows.</p>
+          <ul className="text-xs text-gray-600 mt-2 list-disc ml-4 space-y-1">
+            <li>✅ Valid rows are highlighted</li>
+            <li>❌ Invalid rows show error messages</li>
+            <li>FBR token is handled server-side</li>
+          </ul>
+        </div>
+      </div>
 
-        <div className="flex gap-2 items-center flex-wrap">
-          <button onClick={downloadTemplate} className="px-4 py-2 bg-gray-800 text-white rounded">Download Excel Template</button>
-          <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} />
-          <button onClick={uploadForPreview} disabled={!file || uploading} className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50">{uploading ? 'Uploading...' : 'Upload & Preview'}</button>
+      {/* Columns helper */}
+      <div className="bg-white p-4 rounded border mb-4">
+        <p className="text-sm text-gray-700 mb-2 font-medium">Template columns (first row must be headers):</p>
+        <div className="flex flex-wrap gap-2">
+          {columnsHelp.map((c) => (
+            <span key={c} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded border">{c}</span>
+          ))}
         </div>
       </div>
 
@@ -131,7 +199,7 @@ function UploadInvoices() {
       )}
 
       {preview.length > 0 && (
-        <div className="bg-white rounded shadow p-4 mb-4">
+        <div className="bg-white rounded border p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold">Preview ({totalInvoices} valid rows)</h3>
             <button disabled={submitting || errors.length>0 || preview.length===0} onClick={handleSubmitBulk} className="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50">
@@ -141,7 +209,7 @@ function UploadInvoices() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50">
+                <tr className="bg-gray-50 sticky top-0">
                   <th className="p-2 text-left">Status</th>
                   <th className="p-2 text-left">Invoice #</th>
                   <th className="p-2 text-left">Buyer</th>
