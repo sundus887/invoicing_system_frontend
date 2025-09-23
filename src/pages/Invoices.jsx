@@ -325,11 +325,6 @@ function InvoicesPage() {
       setError('Only sellers can create invoices');
       return;
     }
-    
-    if (!fbrAuthStatus) {
-      setError('Please authenticate with FBR first in Seller Settings');
-      return;
-    }
 
     if (!form.buyerId) {
       setError('Please select a buyer');
@@ -361,12 +356,13 @@ function InvoicesPage() {
         status: form.status
       };
 
-      const response = await api.post('/invoices', invoiceData);
+      // Create invoice (FBR auth not strictly required for creation)
+      const response = await api.post('/api/invoices', invoiceData);
       console.log('✅ Invoice created successfully:', response.data);
       
       if (response.data.success) {
         // Submit to FBR
-        const fbrResponse = await api.post('/fbrinvoices/create-from-invoice', {
+        const fbrResponse = await api.post('/api/fbrinvoices/create-from-invoice', {
           invoiceNumber: response.data.invoice.invoiceNumber,
           sandbox: true
         });

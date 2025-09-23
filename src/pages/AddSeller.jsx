@@ -81,24 +81,8 @@ const AddSeller = () => {
       if (configResponse.data.success) {
         setSuccess('Seller configuration saved successfully!');
         setIsEditing(false);
-        
-        // Attempt FBR authentication
-        const authResponse = await api.post('/api/fbr-auth/login', {
-          clientId: sellerConfig.fbrClientId,
-          clientSecret: sellerConfig.fbrClientSecret,
-          sellerNTN: sellerConfig.sellerNTN,
-          sellerSTRN: sellerConfig.sellerSTRN,
-          businessName: sellerConfig.companyName,
-          environment: sellerConfig.environment
-        });
-        
-        if (authResponse.data.success) {
-          setIsAuthenticated(true);
-          setSuccess('Seller configuration saved and FBR authentication successful!');
-          await checkFbrAuthStatus(); // Refresh auth status
-        } else {
-          setError('Configuration saved but FBR authentication failed. Please check your credentials.');
-        }
+        // Do not force FBR login here; backend will manage tokens automatically if credentials are stored server-side
+        await checkFbrAuthStatus();
       }
     } catch (err) {
       console.error('❌ Error saving seller config:', err);
@@ -209,7 +193,7 @@ const AddSeller = () => {
             {!isAuthenticated ? (
               <button
                 onClick={handleFbrLogin}
-                disabled={authLoading || !sellerConfig.fbrClientId}
+                disabled={authLoading}
                 className="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
               >
                 {authLoading ? 'Authenticating...' : 'Login to FBR'}
@@ -323,7 +307,7 @@ const AddSeller = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              FBR Client ID *
+              FBR Client ID (Optional)
             </label>
             <input
               type="text"
@@ -333,13 +317,13 @@ const AddSeller = () => {
                 isEditing ? 'bg-white' : 'bg-gray-50'
               }`}
               readOnly={!isEditing}
-              required
+              placeholder="If blank, backend will use server-stored credentials"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              FBR Client Secret *
+              FBR Client Secret (Optional)
             </label>
             <input
               type="password"
@@ -349,7 +333,7 @@ const AddSeller = () => {
                 isEditing ? 'bg-white' : 'bg-gray-50'
               }`}
               readOnly={!isEditing}
-              required
+              placeholder="Leave empty to use server-stored secret"
             />
           </div>
 
