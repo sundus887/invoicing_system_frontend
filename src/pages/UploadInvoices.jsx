@@ -63,7 +63,8 @@ function UploadInvoices() {
   const downloadTemplate = async () => {
     try {
       if (!sellerId) return setErrors(['Missing seller/company id. Please relogin or set up seller configuration.']);
-      const res = await api.get(`/api/company/${sellerId}/template`, { responseType: 'blob' });
+      const companyId = encodeURIComponent(sellerId);
+      const res = await api.get(`/api/company/${companyId}/template`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement('a');
       a.href = url;
@@ -107,14 +108,30 @@ function UploadInvoices() {
       setUploading(true);
       const form = new FormData();
       form.append('file', file);
-      const res = await api.post(`/api/upload/${sellerId}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const companyId = encodeURIComponent(sellerId);
+      const res = await api.post(`/api/upload/${companyId}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
       // Expecting { preview: [...], errors: [...], uploadId?: string }
       setPreview(res.data.preview || []);
       setErrors(res.data.errors || []);
       if (res.data.uploadId) setUploadId(res.data.uploadId);
     } catch (err) {
       console.error('Upload/preview error', err);
-      setErrors([err.response?.data?.message || 'Upload failed']);
+      const fallback = 'Upload failed';
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          try {
+            const json = JSON.parse(text);
+            setErrors([json.message || fallback]);
+          } catch (_) {
+            setErrors([text || fallback]);
+          }
+        } catch (_) {
+          setErrors([fallback]);
+        }
+      } else {
+        setErrors([err.response?.data?.message || fallback]);
+      }
     } finally {
       setUploading(false);
     }
@@ -134,8 +151,9 @@ function UploadInvoices() {
     setSuccess(null);
     setServerReport(null);
     try {
+      const companyId = encodeURIComponent(sellerId);
       const payload = uploadId ? { uploadId } : { preview };
-      const res = await api.post(`/api/company/${sellerId}/submit`, payload);
+      const res = await api.post(`/api/company/${companyId}/submit`, payload);
       setServerReport(res.data);
       setSuccess('Bulk upload completed. See the result report below.');
     } catch (err) {
