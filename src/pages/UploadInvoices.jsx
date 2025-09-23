@@ -30,7 +30,6 @@ function UploadInvoices() {
 
   const handleFileChange = (e) => {
     setFile(e.target.files?.[0] || null);
-    setRows([]);
     setErrors([]);
     setSuccess(null);
     setServerReport(null);
