@@ -97,9 +97,8 @@ const AddSeller = () => {
     setError(null);
     
     try {
+      // Do not enforce clientId/clientSecret; backend will use server-stored credentials if these are blank
       const response = await api.post('/api/fbr-auth/login', {
-        clientId: sellerConfig.fbrClientId,
-        clientSecret: sellerConfig.fbrClientSecret,
         sellerNTN: sellerConfig.sellerNTN,
         sellerSTRN: sellerConfig.sellerSTRN,
         businessName: sellerConfig.companyName,
@@ -210,8 +209,8 @@ const AddSeller = () => {
         </div>
         
         {!isAuthenticated && (
-          <p className="text-sm text-red-600 mt-2">
-            ⚠️ FBR authentication is required to create invoices. Please configure your credentials and login.
+          <p className="text-sm text-orange-600 mt-2">
+            You can create invoices without FBR login. Authentication is only required when submitting invoices to FBR.
           </p>
         )}
       </div>
@@ -384,7 +383,7 @@ const AddSeller = () => {
         <h4 className="text-md font-semibold text-blue-800 mb-2">Important Notes:</h4>
         <ul className="text-sm text-blue-700 space-y-1">
           <li>• This is a one-time configuration for your company's FBR integration</li>
-          <li>• FBR authentication is required to create and submit invoices</li>
+          <li>• FBR authentication is required only when submitting invoices to FBR (not for creating local invoices)</li>
           <li>• Use Sandbox environment for testing before switching to Production</li>
           <li>• Keep your FBR credentials secure and never share them</li>
           <li>• Only one seller configuration is allowed per application</li>

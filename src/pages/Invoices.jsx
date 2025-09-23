@@ -468,8 +468,8 @@ function InvoicesPage() {
           </span>
         </div>
         {!fbrAuthStatus && (
-          <p className="text-sm text-red-600 mt-2">
-            ⚠ Please authenticate with FBR in Seller Settings before creating invoices
+          <p className="text-sm text-orange-600 mt-2">
+            You can create invoices without FBR login. Authentication is only required when submitting to FBR.
           </p>
         )}
       </div>
@@ -497,9 +497,9 @@ function InvoicesPage() {
           <button
             className="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold flex items-center gap-2 disabled:opacity-50"
             onClick={() => setShowForm(true)}
-            disabled={!fbrAuthStatus}
+            disabled={false}
           >
-            <span className="text-xl">+</span> Create FBR Invoice
+            <span className="text-xl">+</span> Create Invoice
           </button>
         </div>
       </div>
