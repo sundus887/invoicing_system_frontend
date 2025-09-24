@@ -120,17 +120,35 @@ function UploadInvoices() {
 
   const downloadTemplate = async () => {
     try {
+      setErrors([]);
+      setSuccess(null);
       if (!sellerId) return setErrors(['Missing seller/company id. Please relogin or set up seller configuration.']);
-      const companyId = encodeURIComponent(sellerId);
-      const res = await api.get(`/api/company/${companyId}/template`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+
+      // 1) Probe availability (do not parse binary as JSON)
+      const probe = await fetch('/api/company-import/template/status', { credentials: 'include' });
+      let statusJson = { available: false };
+      try {
+        statusJson = await probe.json();
+      } catch (_) {
+        // ignore JSON parse errors
+      }
+      if (!probe.ok || !statusJson?.available) {
+        throw new Error(statusJson?.message || 'Template unavailable');
+      }
+
+      // 2) Download binary as Blob
+      const res = await fetch('/api/company-import/template', { credentials: 'include' });
+      if (!res.ok) throw new Error('Template download failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'invoice-template.xlsx';
+      a.download = statusJson?.fileName || 'template.xlsx';
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      setSuccess('Template downloaded.');
     } catch (err) {
       console.error('Template download error', err);
       // Try to extract a human-readable error message even if response is a Blob
@@ -154,9 +172,7 @@ function UploadInvoices() {
           .replace(/<[^>]*>/g, '').slice(0, 300);
         setErrors([msg || fallback]);
       }
-      // Fallback: provide a client-side CSV template instantly so user is not blocked
-      downloadExcelTemplateLocal();
-      setSuccess('Backend Excel template not available. A local Excel (.xls) template with bold headers has been downloaded. You can also download CSV template below.');
+      // Optional: we no longer auto-download local template; user asked for a single option.
     }
   };
 
