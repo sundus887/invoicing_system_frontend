@@ -120,6 +120,7 @@ function UploadInvoices() {
 
   const downloadTemplate = async () => {
     try {
+      // Clear existing banners before starting
       setErrors([]);
       setSuccess(null);
       if (!sellerId) return setErrors(['Missing seller/company id. Please relogin or set up seller configuration.']);
@@ -133,27 +134,27 @@ function UploadInvoices() {
       } catch (_) {
         // ignore JSON parse errors
       }
-      const probeOk = probe.ok && statusJson?.available;
-
-      if (probeOk) {
-        // 2) Download binary as Blob
-        const res = await fetch(`/api/company-import/template?${q}`, { credentials: 'include' });
-        if (!res.ok) throw new Error('Template download failed');
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = statusJson?.fileName || 'template.xlsx';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        setSuccess('Template downloaded.');
-      } else {
-        // Backend not available — fall back to local strong .xlsx with bold headers
-        await downloadExcelTemplateLocal();
-        setSuccess('Backend template unavailable. A local Excel template with bold headers has been downloaded.');
+      if (!probe.ok || !statusJson?.available) {
+        // Minimal error message, no automatic fallback
+        throw new Error(statusJson?.message || 'Template unavailable');
       }
+
+      // 2) Download binary as Blob
+      const res = await fetch(`/api/company-import/template?${q}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Template download failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = statusJson?.fileName || 'template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      // 4) Clear banners on success (IMPORTANT)
+      setErrors([]);
+      setSuccess(null);
     } catch (err) {
       console.error('Template download error', err);
       // Try to extract a human-readable error message even if response is a Blob
@@ -177,11 +178,7 @@ function UploadInvoices() {
           .replace(/<[^>]*>/g, '').slice(0, 300);
         setErrors([msg || fallback]);
       }
-      // As a last resort, attempt local template
-      try {
-        await downloadExcelTemplateLocal();
-        setSuccess('Local Excel template has been downloaded.');
-      } catch {}
+      // Do not auto-trigger local fallback here per requirement
     }
   };
 
