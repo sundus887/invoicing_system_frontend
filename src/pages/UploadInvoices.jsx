@@ -4,18 +4,20 @@ import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import generatePDFInvoice from '../components/PDFInvoice';
 
+// Seller columns first, then Buyer columns (as requested)
 const columnsHelp = [
   'InvoiceType',
   'IssuedDate (yyyy-mm-dd)',
   'InvoiceNumber (optional)',
-  'BuyerName',
-  'BuyerSTRN',
-  'BuyerNTN',
-  'Address',
   'SellerBusinessName',
   'SellerProvince',
   'SellerAddress',
   'SellerNTNOrCNIC',
+  'SellerSTRN (optional)',
+  'BuyerName',
+  'BuyerSTRN',
+  'BuyerNTN',
+  'Address',
   'ItemDescription',
   'Quantity',
   'UnitPrice',
@@ -120,7 +122,7 @@ function UploadInvoices() {
     } catch (err) {
       console.error('Template download error', err);
       // Try to extract a human-readable error message even if response is a Blob
-      const fallback = 'Failed to download template';
+      const fallback = 'Template download failed. Use Local Excel/CSV template below.';
       if (err?.response?.data instanceof Blob) {
         try {
           const text = await err.response.data.text();
@@ -129,17 +131,20 @@ function UploadInvoices() {
             const json = JSON.parse(text);
             setErrors([json.message || fallback]);
           } catch (_) {
-            setErrors([text || fallback]);
+            const cleaned = (text || '').replace(/<[^>]*>/g, '').slice(0, 300);
+            setErrors([cleaned || fallback]);
           }
         } catch (_) {
           setErrors([fallback]);
         }
       } else {
-        setErrors([err.response?.data?.message || fallback]);
+        const msg = err.response?.data?.message || String(err.message || '')
+          .replace(/<[^>]*>/g, '').slice(0, 300);
+        setErrors([msg || fallback]);
       }
       // Fallback: provide a client-side CSV template instantly so user is not blocked
       downloadExcelTemplateLocal();
-      setSuccess('Backend Excel template not available. A local Excel (.xls) template with bold headers has been downloaded. You can also download CSV template if you prefer.');
+      setSuccess('Backend Excel template not available. A local Excel (.xls) template with bold headers has been downloaded. You can also download CSV template below.');
     }
   };
 
@@ -253,10 +258,11 @@ function UploadInvoices() {
           <div className="font-semibold">Download Template</div>
           <p className="text-sm text-gray-600 mt-1">Company-tailored Excel with required columns.</p>
           <div className="flex flex-wrap items-center gap-3 mt-3">
-            <button onClick={downloadTemplate} disabled={!sellerId} className="px-4 py-2 bg-gray-900 text-white rounded disabled:opacity-50">Download Excel Template</button>
-            <button type="button" onClick={downloadExcelTemplateLocal} className="text-sm text-blue-700 hover:underline">Download Excel (Local)</button>
-            <button type="button" onClick={downloadCsvTemplate} className="text-sm text-blue-700 hover:underline">Download CSV Template</button>
+            <button onClick={downloadTemplate} disabled={!sellerId} className="px-4 py-2 bg-black text-white rounded disabled:opacity-50">Download Excel Template</button>
+            <button type="button" onClick={downloadExcelTemplateLocal} className="px-4 py-2 bg-black text-white rounded">Download Excel (Local)</button>
+            <button type="button" onClick={downloadCsvTemplate} className="px-4 py-2 bg-black text-white rounded">Download CSV Template</button>
           </div>
+          <div className="text-xs text-gray-600 mt-2">Seller information will be auto-filled by the system when generating FBR invoices; keep seller columns for reference.</div>
           {!sellerId && (
             <div className="text-xs text-orange-600 mt-2">Seller/Company ID missing. Please login or configure seller details first.</div>
           )}
