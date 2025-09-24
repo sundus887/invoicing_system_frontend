@@ -87,8 +87,16 @@ function UploadInvoices() {
     }
   };
 
+  const isExcel = (f) => !!f && (/\.xlsx$/i.test(f.name) || /\.xls$/i.test(f.name));
+
   const handleFileChange = (e) => {
-    setFile(e.target.files?.[0] || null);
+    const f = e.target.files?.[0] || null;
+    if (f && !isExcel(f)) {
+      setFile(null);
+      setErrors(['Only Excel files (.xlsx, .xls) are allowed']);
+      return;
+    }
+    setFile(f);
     setErrors([]);
     setSuccess(null);
     setServerReport(null);
@@ -100,6 +108,10 @@ function UploadInvoices() {
     setDragOver(false);
     const f = e.dataTransfer?.files?.[0];
     if (!f) return;
+    if (!isExcel(f)) {
+      setErrors(['Only Excel files (.xlsx, .xls) are allowed']);
+      return;
+    }
     setFile(f);
     setErrors([]);
     setSuccess(null);
@@ -135,8 +147,11 @@ function UploadInvoices() {
         // ignore JSON parse errors
       }
       if (!probe.ok || !statusJson?.available) {
-        // Minimal error message, no automatic fallback
-        throw new Error(statusJson?.message || 'Template unavailable');
+        // Backend not ready — gracefully fall back to local generator
+        await downloadExcelTemplateLocal();
+        setErrors([]);
+        setSuccess('Backend template unavailable. A local Excel template with bold headers has been downloaded.');
+        return;
       }
 
       // 2) Download binary as Blob
@@ -178,7 +193,12 @@ function UploadInvoices() {
           .replace(/<[^>]*>/g, '').slice(0, 300);
         setErrors([msg || fallback]);
       }
-      // Do not auto-trigger local fallback here per requirement
+      // As a last resort, still provide the local template so user is not blocked
+      try {
+        await downloadExcelTemplateLocal();
+        setErrors([]);
+        setSuccess('A local Excel template with bold headers has been downloaded.');
+      } catch {}
     }
   };
 
@@ -309,10 +329,10 @@ function UploadInvoices() {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
           >
-            <div className="text-sm text-gray-700">Drop .xlsx/.csv here or</div>
+            <div className="text-sm text-gray-700">Drop .xlsx/.xls here or</div>
             <label className="inline-block mt-2 px-4 py-2 bg-white border rounded cursor-pointer hover:bg-gray-100">
               Choose File
-              <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileChange} className="hidden" />
+              <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
             </label>
             {file && (
               <div className="mt-2 text-xs text-gray-600">Selected: {file.name}</div>
