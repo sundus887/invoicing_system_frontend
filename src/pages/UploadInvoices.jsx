@@ -125,34 +125,39 @@ function UploadInvoices() {
       if (!sellerId) return setErrors(['Missing seller/company id. Please relogin or set up seller configuration.']);
 
       // 1) Probe availability (do not parse binary as JSON)
-      const probe = await fetch('/api/company-import/template/status', { credentials: 'include' });
+      const q = `sellerId=${encodeURIComponent(sellerId)}`;
+      const probe = await fetch(`/api/company-import/template/status?${q}`, { credentials: 'include' });
       let statusJson = { available: false };
       try {
         statusJson = await probe.json();
       } catch (_) {
         // ignore JSON parse errors
       }
-      if (!probe.ok || !statusJson?.available) {
-        throw new Error(statusJson?.message || 'Template unavailable');
-      }
+      const probeOk = probe.ok && statusJson?.available;
 
-      // 2) Download binary as Blob
-      const res = await fetch('/api/company-import/template', { credentials: 'include' });
-      if (!res.ok) throw new Error('Template download failed');
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = statusJson?.fileName || 'template.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      setSuccess('Template downloaded.');
+      if (probeOk) {
+        // 2) Download binary as Blob
+        const res = await fetch(`/api/company-import/template?${q}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Template download failed');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = statusJson?.fileName || 'template.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        setSuccess('Template downloaded.');
+      } else {
+        // Backend not available — fall back to local strong .xlsx with bold headers
+        await downloadExcelTemplateLocal();
+        setSuccess('Backend template unavailable. A local Excel template with bold headers has been downloaded.');
+      }
     } catch (err) {
       console.error('Template download error', err);
       // Try to extract a human-readable error message even if response is a Blob
-      const fallback = 'Template download failed. Use Local Excel/CSV template below.';
+      const fallback = 'Template download failed.';
       if (err?.response?.data instanceof Blob) {
         try {
           const text = await err.response.data.text();
@@ -172,7 +177,11 @@ function UploadInvoices() {
           .replace(/<[^>]*>/g, '').slice(0, 300);
         setErrors([msg || fallback]);
       }
-      // Optional: we no longer auto-download local template; user asked for a single option.
+      // As a last resort, attempt local template
+      try {
+        await downloadExcelTemplateLocal();
+        setSuccess('Local Excel template has been downloaded.');
+      } catch {}
     }
   };
 
