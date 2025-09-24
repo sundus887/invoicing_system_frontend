@@ -56,22 +56,30 @@ function UploadInvoices() {
     }
   };
 
-  // Helper: generate a simple Excel (.xls) using HTML table with bold headers (works in Excel)
-  const downloadExcelTemplateLocal = () => {
+  // Helper: generate a real .xlsx Excel file (no warning dialog). Styling like bold headers is not supported in community build.
+  const downloadExcelTemplateLocal = async () => {
     try {
-      const headerCells = columnsHelp.map(h => `<th style="font-weight:bold;border:1px solid #000;padding:4px;">${h.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</th>`).join('');
-      const tableHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><table><thead><tr>${headerCells}</tr></thead><tbody><tr>${columnsHelp.map(()=>'<td style="border:1px solid #ccc;padding:4px;"></td>').join('')}</tr></tbody></table></body></html>`;
-      const blob = new Blob([tableHtml], { type: 'application/vnd.ms-excel' });
+      const XLSX = await import('xlsx');
+      const data = [columnsHelp]; // header row only
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      // Optionally set column widths for readability
+      ws['!cols'] = columnsHelp.map(h => ({ wch: Math.min(Math.max(h.length + 2, 14), 30) }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Template');
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'invoice-template.xls';
+      a.download = 'invoice-template.xlsx';
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (e) {
       console.error('Local Excel template download failed', e);
+      // Fallback to CSV if XLSX generation fails
+      downloadCsvTemplate();
     }
   };
 
@@ -259,8 +267,6 @@ function UploadInvoices() {
           <p className="text-sm text-gray-600 mt-1">Company-tailored Excel with required columns.</p>
           <div className="flex flex-wrap items-center gap-3 mt-3">
             <button onClick={downloadTemplate} disabled={!sellerId} className="px-4 py-2 bg-black text-white rounded disabled:opacity-50">Download Excel Template</button>
-            <button type="button" onClick={downloadExcelTemplateLocal} className="px-4 py-2 bg-black text-white rounded">Download Excel (Local)</button>
-            <button type="button" onClick={downloadCsvTemplate} className="px-4 py-2 bg-black text-white rounded">Download CSV Template</button>
           </div>
           <div className="text-xs text-gray-600 mt-2">Seller information will be auto-filled by the system when generating FBR invoices; keep seller columns for reference.</div>
           {!sellerId && (

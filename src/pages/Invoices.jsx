@@ -511,7 +511,150 @@ function InvoicesPage() {
         </div>
       </div>
 
-      {/* ... (rest of your invoice creation form code remains unchanged) */}
+      {/* Create Invoice Inline Form */}
+      {showForm && (
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold">Create FBR Invoice</h3>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="text-sm px-3 py-1 rounded border"
+            >
+              Cancel
+            </button>
+          </div>
+
+          {/* Buyer selection */}
+          <div className="mb-3">
+            <label className="block text-sm font-medium mb-1">Buyer</label>
+            <select
+              className="w-full border rounded px-3 py-2 text-sm"
+              value={form.buyerId}
+              onChange={(e) => setForm(prev => ({ ...prev, buyerId: e.target.value }))}
+            >
+              <option value="">Select buyer...</option>
+              {buyers.map(b => (
+                <option key={b._id || b.id} value={b._id || b.id}>
+                  {b.companyName || b.name || b.email}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Items table */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium">Items</label>
+              <button type="button" onClick={addItem} className="text-sm px-3 py-1 rounded border">+ Add Item</button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left p-2">Description</th>
+                    <th className="text-left p-2">Quantity</th>
+                    <th className="text-left p-2">Unit Price</th>
+                    <th className="text-left p-2">HS Code</th>
+                    <th className="text-left p-2">Total</th>
+                    <th className="p-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {form.items.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="p-2">
+                        <input
+                          className="w-full border rounded px-2 py-1"
+                          value={item.description}
+                          placeholder="Item description"
+                          onChange={(e) => handleItemDescriptionChange(idx, e.target.value)}
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-24 border rounded px-2 py-1"
+                          value={item.quantity}
+                          onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="w-28 border rounded px-2 py-1"
+                          value={item.unitPrice}
+                          onChange={(e) => updateItem(idx, 'unitPrice', e.target.value)}
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          className="w-32 border rounded px-2 py-1"
+                          placeholder="e.g. 9983.99.00"
+                          value={item.hsCode}
+                          onChange={(e) => updateItem(idx, 'hsCode', e.target.value)}
+                        />
+                      </td>
+                      <td className="p-2 text-right w-28">
+                        {(item.totalValue || 0).toFixed(2)}
+                      </td>
+                      <td className="p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeItem(idx)}
+                          className="text-sm text-red-600 hover:underline"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Totals and date */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Issued Date</label>
+              <input
+                type="date"
+                className="w-full border rounded px-3 py-2 text-sm"
+                value={form.issuedDate}
+                onChange={(e) => setForm(prev => ({ ...prev, issuedDate: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Total Amount</label>
+              <input disabled className="w-full border rounded px-3 py-2 text-sm bg-gray-50" value={(form.totalAmount || 0).toFixed(2)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Final Amount</label>
+              <input disabled className="w-full border rounded px-3 py-2 text-sm bg-gray-50" value={(form.finalValue || 0).toFixed(2)} />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleAddInvoice}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Save Invoice
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="px-4 py-2 rounded border"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Invoices Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
