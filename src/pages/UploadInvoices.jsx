@@ -2,14 +2,20 @@
 import React, { useMemo, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import generatePDFInvoice from '../components/PDFInvoice';
 
 const columnsHelp = [
+  'InvoiceType',
+  'IssuedDate (yyyy-mm-dd)',
   'InvoiceNumber (optional)',
   'BuyerName',
   'BuyerSTRN',
   'BuyerNTN',
   'Address',
-  'IssuedDate (yyyy-mm-dd)',
+  'SellerBusinessName',
+  'SellerProvince',
+  'SellerAddress',
+  'SellerNTNOrCNIC',
   'ItemDescription',
   'Quantity',
   'UnitPrice',
@@ -45,6 +51,25 @@ function UploadInvoices() {
       window.URL.revokeObjectURL(url);
     } catch (e) {
       console.error('CSV template download failed', e);
+    }
+  };
+
+  // Helper: generate a simple Excel (.xls) using HTML table with bold headers (works in Excel)
+  const downloadExcelTemplateLocal = () => {
+    try {
+      const headerCells = columnsHelp.map(h => `<th style="font-weight:bold;border:1px solid #000;padding:4px;">${h.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</th>`).join('');
+      const tableHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><table><thead><tr>${headerCells}</tr></thead><tbody><tr>${columnsHelp.map(()=>'<td style="border:1px solid #ccc;padding:4px;"></td>').join('')}</tr></tbody></table></body></html>`;
+      const blob = new Blob([tableHtml], { type: 'application/vnd.ms-excel' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'invoice-template.xls';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Local Excel template download failed', e);
     }
   };
 
@@ -113,8 +138,8 @@ function UploadInvoices() {
         setErrors([err.response?.data?.message || fallback]);
       }
       // Fallback: provide a client-side CSV template instantly so user is not blocked
-      downloadCsvTemplate();
-      setSuccess('Backend template not available. A CSV template has been downloaded instead. You can upload CSV or Excel.');
+      downloadExcelTemplateLocal();
+      setSuccess('Backend Excel template not available. A local Excel (.xls) template with bold headers has been downloaded. You can also download CSV template if you prefer.');
     }
   };
 
@@ -178,6 +203,34 @@ function UploadInvoices() {
       const res = await api.post(`/api/company/${companyId}/submit`, payload);
       setServerReport(res.data);
       setSuccess('Bulk upload completed. See the result report below.');
+
+      // Attempt to auto-generate and download PDFs for successful invoices
+      try {
+        const rows = (res?.data?.results || res?.data?.invoices || res?.data?.data || [])
+          .map(r => ({ ...r }))
+          .filter(r => (r.__valid === true) || (r.status?.toString().toLowerCase() === 'success') || r.irn || r.IRN || r.uuid);
+
+        for (const row of rows) {
+          // Build minimal buyer and seller objects from row if available
+          const buyer = {
+            companyName: row.buyerName || row.buyerCompany,
+            address: row.address,
+            buyerSTRN: row.buyerSTRN,
+            buyerNTN: row.buyerNTN,
+            truckNo: row.truckNo,
+          };
+          const seller = {
+            companyName: row.sellerBusinessName,
+            sellerProvince: row.sellerProvince,
+            address: row.sellerAddress,
+            sellerNTN: row.sellerNTNOrCNIC,
+            sellerSTRN: row.sellerSTRN,
+          };
+          await generatePDFInvoice(row, buyer, seller);
+        }
+      } catch (pdfErr) {
+        console.warn('PDF auto-download skipped due to error:', pdfErr);
+      }
     } catch (err) {
       console.error('Bulk upload error', err);
       setErrors([err.response?.data?.message || 'Bulk upload failed']);
@@ -201,6 +254,7 @@ function UploadInvoices() {
           <p className="text-sm text-gray-600 mt-1">Company-tailored Excel with required columns.</p>
           <div className="flex flex-wrap items-center gap-3 mt-3">
             <button onClick={downloadTemplate} disabled={!sellerId} className="px-4 py-2 bg-gray-900 text-white rounded disabled:opacity-50">Download Excel Template</button>
+            <button type="button" onClick={downloadExcelTemplateLocal} className="text-sm text-blue-700 hover:underline">Download Excel (Local)</button>
             <button type="button" onClick={downloadCsvTemplate} className="text-sm text-blue-700 hover:underline">Download CSV Template</button>
           </div>
           {!sellerId && (
@@ -217,10 +271,10 @@ function UploadInvoices() {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
           >
-            <div className="text-sm text-gray-700">Drop .xlsx here or</div>
+            <div className="text-sm text-gray-700">Drop .xlsx/.csv here or</div>
             <label className="inline-block mt-2 px-4 py-2 bg-white border rounded cursor-pointer hover:bg-gray-100">
               Choose File
-              <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
+              <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileChange} className="hidden" />
             </label>
             {file && (
               <div className="mt-2 text-xs text-gray-600">Selected: {file.name}</div>

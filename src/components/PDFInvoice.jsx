@@ -1,25 +1,22 @@
 // Defer loading of jspdf until actually needed to reduce initial bundle size
 
-// Function to generate QR code data URL with specific invoice information
-const generateQRCodeDataURL = async (invoice, buyer, seller) => {
+// Function to resolve QR code data URL: prefer backend-provided QR image/string
+const resolveQRCodeDataURL = async (invoice, buyer, seller) => {
   try {
-    // Create the data string with the required information
-    const qrData = {
-      buyerNTN: buyer?.buyerNTN || 'N/A',
-      sellerNTN: seller?.sellerNTN || 'N/A',
-      invoiceDate: invoice.issuedDate ? new Date(invoice.issuedDate).toLocaleDateString() : 'N/A',
-      invoiceNumber: invoice.invoiceNumber || invoice._id?.slice(-6) || 'N/A'
-    };
-    
-    // Convert to JSON string
-    const qrDataString = JSON.stringify(qrData);
-    
-    console.log('📱 QR Code Data:', qrData);
-    console.log('📱 QR Code String:', qrDataString);
-    
-    // For now, return null to avoid QR code generation issues
-    // The QR code functionality can be added later with proper library setup
-    console.log('⚠️ QR Code generation temporarily disabled - will be implemented with proper library');
+    // Prefer backend-provided QR code
+    if (invoice?.qrCode) {
+      const v = invoice.qrCode;
+      // If already a data URL
+      if (typeof v === 'string' && v.startsWith('data:image')) return v;
+      // If base64 without prefix (assume PNG)
+      if (typeof v === 'string' && /^[A-Za-z0-9+/=]+$/.test(v)) {
+        return `data:image/png;base64,${v}`;
+      }
+      // If it's a URL to an image, try to use it directly
+      if (typeof v === 'string' && /^https?:\/\//.test(v)) return v;
+    }
+    // If no backend QR, we skip generating locally for now
+    console.log('⚠️ No backend QR provided; skipping QR embedding');
     return null;
     
   } catch (error) {
@@ -39,8 +36,8 @@ const generatePDFInvoice = async (invoice, buyer, seller) => {
     console.log('👤 Buyer NTN:', buyer?.buyerNTN);
     console.log('🏢 Seller NTN:', seller?.sellerNTN);
     
-    // Generate QR code with specific invoice data
-    const qrCodeDataURL = await generateQRCodeDataURL(invoice, buyer, seller);
+    // Resolve QR code (prefer backend-provided)
+    const qrCodeDataURL = await resolveQRCodeDataURL(invoice, buyer, seller);
     
     // Dynamically import jsPDF only when needed
     const { default: jsPDF } = await import('jspdf');
@@ -50,18 +47,24 @@ const generatePDFInvoice = async (invoice, buyer, seller) => {
     // Set initial position
     let y = 20;
     
+    // Normalize new seller fields from invoice if present
+    const sellerBusinessName = invoice?.sellerBusinessName || seller?.companyName || seller?.sellerBusinessName;
+    const sellerProvince = invoice?.sellerProvince || seller?.sellerProvince;
+    const sellerAddress = invoice?.sellerAddress || seller?.address;
+    const sellerNTNOrCNIC = invoice?.sellerNTNOrCNIC || seller?.sellerNTN || seller?.sellerCNIC || seller?.sellerNTNOrCNIC;
+
     // ===== SELLER INFORMATION SECTION =====
     // Company Header - Centered and professional
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text(seller?.companyName || 'SELLER COMPANY NAME', 105, y, { align: 'center' });
+    doc.text(sellerBusinessName || 'SELLER COMPANY NAME', 105, y, { align: 'center' });
     y += 8;
     
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text(seller?.address || 'Seller Address', 105, y, { align: 'center' });
+    doc.text(sellerAddress || 'Seller Address', 105, y, { align: 'center' });
     y += 6;
-    doc.text(`Tel: ${seller?.phone || '+92-51-1234567'}`, 105, y, { align: 'center' });
+    doc.text(`${sellerProvince ? `Province: ${sellerProvince}  ` : ''}NTN/CNIC: ${sellerNTNOrCNIC || 'N/A'}`, 105, y, { align: 'center' });
     y += 12;
     
     // Professional horizontal line
@@ -73,7 +76,8 @@ const generatePDFInvoice = async (invoice, buyer, seller) => {
     // ===== INVOICE TITLE =====
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('SALES TAX INVOICE', 105, y, { align: 'center' });
+    const invoiceType = invoice?.invoiceType || invoice?.InvoiceType;
+    doc.text(`${invoiceType ? `${invoiceType.toString().toUpperCase()} ` : ''}SALES TAX INVOICE`, 105, y, { align: 'center' });
     y += 20;
     
     // ===== INVOICE DETAILS SECTION =====
@@ -81,7 +85,7 @@ const generatePDFInvoice = async (invoice, buyer, seller) => {
     doc.setFont('helvetica', 'normal');
     
     // Left column - Seller details (aligned properly)
-    doc.text(`NTN: ${seller?.sellerNTN || 'N/A'}`, 20, y);
+    doc.text(`NTN/CNIC: ${sellerNTNOrCNIC || 'N/A'}`, 20, y);
     doc.text(`Invoice No: ${invoice.invoiceNumber || invoice._id?.slice(-6) || 'N/A'}`, 20, y + 8);
     
     // Right column - Date and STRN (aligned properly)

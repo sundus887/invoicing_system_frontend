@@ -19,6 +19,8 @@ const UserRoles = lazy(() => import(/* webpackChunkName: "page-user-roles" */ '.
 const SellerConfigurationPage = lazy(() => import(/* webpackChunkName: "page-seller-config" */ '../pages/SellerConfigurationPage'));
 const UploadInvoices = lazy(() => import(/* webpackChunkName: "page-upload" */ '../pages/UploadInvoices'));
 const InvoiceHistory = lazy(() => import(/* webpackChunkName: "page-history" */ '../pages/InvoiceHistory'));
+const SellerForm = lazy(() => import(/* webpackChunkName: "page-seller-form" */ '../pages/SellerForm'));
+const InvoiceUploadDirect = lazy(() => import(/* webpackChunkName: "page-upload-direct" */ '../pages/InvoiceUploadDirect'));
 
 const AppRoutes = () => {
   const { loading } = useAuth();
@@ -61,11 +63,13 @@ const AppRoutes = () => {
           <Route path="tasks" element={<SellerRoute><TasksPage /></SellerRoute>} />
           <Route path="export" element={<SellerRoute><ExportPage /></SellerRoute>} />
           <Route path="upload" element={<SellerRoute><UploadInvoices /></SellerRoute>} />
+          <Route path="upload-direct" element={<SellerRoute><InvoiceUploadDirect /></SellerRoute>} />
           <Route path="history" element={<SellerRoute><InvoiceHistory /></SellerRoute>} />
           <Route path="fbr-e-invoicing" element={<SellerRoute><FbrEInvoicing /></SellerRoute>} />
           <Route path="settings" element={<Settings />} />
           <Route path="user-roles" element={<AdminRoute><UserRoles /></AdminRoute>} />
           <Route path="sellers" element={<AdminRoute><SellerConfigurationPage /></AdminRoute>} />
+          <Route path="seller-register" element={<AdminRoute><SellerForm /></AdminRoute>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>
