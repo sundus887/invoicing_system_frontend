@@ -56,18 +56,22 @@ function UploadInvoices() {
     }
   };
 
-  // Helper: generate a real .xlsx Excel file (no warning dialog). Styling like bold headers is not supported in community build.
+  // Helper: generate a real .xlsx Excel file with BOLD header row using ExcelJS
   const downloadExcelTemplateLocal = async () => {
     try {
-      const XLSX = await import('xlsx');
-      const data = [columnsHelp]; // header row only
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      // Optionally set column widths for readability
-      ws['!cols'] = columnsHelp.map(h => ({ wch: Math.min(Math.max(h.length + 2, 14), 30) }));
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Template');
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const ExcelJS = (await import('exceljs')).default || (await import('exceljs'));
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Template');
+
+      // Add header row with bold font
+      const headerRow = sheet.addRow(columnsHelp);
+      headerRow.font = { bold: true };
+
+      // Set column widths
+      sheet.columns = columnsHelp.map(h => ({ width: Math.min(Math.max(h.length + 2, 14), 30) }));
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -78,7 +82,7 @@ function UploadInvoices() {
       window.URL.revokeObjectURL(url);
     } catch (e) {
       console.error('Local Excel template download failed', e);
-      // Fallback to CSV if XLSX generation fails
+      // Fallback to CSV if ExcelJS generation fails
       downloadCsvTemplate();
     }
   };
