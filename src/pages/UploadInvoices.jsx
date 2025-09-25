@@ -43,7 +43,10 @@ function UploadInvoices() {
   const { isSeller, isAdmin, sellerId } = useAuth();
 
   const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState([]); // preview rows from backend
+  // Local rows parsed from Excel (editable)
+  const [rows, setRows] = useState([]);
+  const [validated, setValidated] = useState([]);
+  const preview = validated.length ? validated : rows;
   const [errors, setErrors] = useState([]); // validation errors from backend
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(null);
@@ -217,48 +220,97 @@ function UploadInvoices() {
     }
   };
 
+  // Parse Excel locally and hydrate editable rows
   const uploadForPreview = async () => {
     setErrors([]);
-    setPreview([]);
     setSuccess(null);
     setServerReport(null);
     setUploadId(null);
+    setValidated([]);
     if (!file) return setErrors(['Please choose an Excel file first']);
-    if (!sellerId) return setErrors(['Missing seller/company id']);
     try {
       setUploading(true);
-      const form = new FormData();
-      form.append('file', file);
-      const companyId = encodeURIComponent(sellerId);
-      const res = await api.post(`/api/upload/${companyId}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      // Expecting { preview: [...], errors: [...], uploadId?: string }
-      setPreview(res.data.preview || []);
-      setErrors(res.data.errors || []);
-      if (res.data.uploadId) setUploadId(res.data.uploadId);
+      const XLSX = await import('xlsx');
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      // Read with first row as headers
+      const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+      const out = (json.length ? json : []).map((r, idx) => {
+        const obj = {};
+        columnsHelp.forEach(h => { obj[h] = r[h] ?? ''; });
+        // helpers
+        obj.__row = idx + 2; // considering header row is 1
+        obj.__errors = [];
+        obj.__valid = null; // unknown until validation
+        obj.__selected = true; // default selected
+        return obj;
+      });
+      // If sheet had no headers, initialize empty row with headers
+      setRows(out);
     } catch (err) {
-      console.error('Upload/preview error', err);
-      const fallback = 'Upload failed';
-      if (err?.response?.data instanceof Blob) {
-        try {
-          const text = await err.response.data.text();
-          try {
-            const json = JSON.parse(text);
-            setErrors([json.message || fallback]);
-          } catch (_) {
-            setErrors([text || fallback]);
-          }
-        } catch (_) {
-          setErrors([fallback]);
-        }
-      } else {
-        setErrors([err.response?.data?.message || fallback]);
-      }
+      console.error('Local parse error', err);
+      setErrors(['Failed to parse Excel. Make sure it uses the provided template headers.']);
     } finally {
       setUploading(false);
     }
   };
 
-  const totalInvoices = useMemo(() => preview.filter(r => r.__valid === true).length, [preview]);
+  const totalInvoices = useMemo(() => preview.filter(r => r.__valid === true && r.__selected).length, [preview]);
+
+  const handleCellEdit = (rowIndex, key, value) => {
+    setRows(prev => prev.map((r, i) => i === rowIndex ? { ...r, [key]: value } : r));
+    setValidated([]); // invalidate validated cache when editing
+  };
+
+  const toggleRowFlag = (rowIndex, flag) => {
+    if (flag === '__selected') {
+      setRows(prev => prev.map((r, i) => i === rowIndex ? { ...r, __selected: !r.__selected } : r));
+    } else if (flag === '__valid') {
+      setRows(prev => prev.map((r, i) => i === rowIndex ? { ...r, __valid: !r.__valid } : r));
+    }
+  };
+
+  const validateRecords = () => {
+    const numericKeys = new Set(['quantity','Rate','totalValues','valueSalesExcludingST','fedPayable','discount']);
+    const requiredKeys = ['UniqueInvoiceID','invoiceType','InvoiceDate','ProductDescription','quantity','Rate'];
+    const v = rows.map(r => {
+      const errors = [];
+      requiredKeys.forEach(k => { if (!String(r[k] ?? '').trim()) errors.push(`${k} is required`); });
+      // basic date check
+      if (r.InvoiceDate && isNaN(Date.parse(r.InvoiceDate))) errors.push('InvoiceDate is invalid');
+      // numeric checks
+      numericKeys.forEach(k => { if (r[k] !== '' && isNaN(Number(r[k]))) errors.push(`${k} must be a number`); });
+      return { ...r, __errors: errors, __valid: errors.length === 0 };
+    });
+    setValidated(v);
+    if (v.every(x => x.__errors.length === 0)) {
+      setErrors([]);
+      setSuccess('All rows validated');
+    } else {
+      setErrors(['Some rows have validation errors.']);
+      setSuccess(null);
+    }
+  };
+
+  const submitValidated = async () => {
+    try {
+      setSubmitting(true);
+      setErrors([]);
+      setSuccess(null);
+      if (!sellerId) throw new Error('Missing seller/company id');
+      const toSubmit = preview.filter(r => (r.__valid === true) && r.__selected);
+      if (!toSubmit.length) throw new Error('No valid rows to submit');
+      const companyId = encodeURIComponent(sellerId);
+      const res = await api.post(`/api/invoice/submit/${companyId}`, { rows: toSubmit });
+      setServerReport(res.data);
+      setSuccess('Submitted successfully');
+    } catch (e) {
+      setErrors([e?.response?.data?.message || e.message || 'Submit failed']);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleSubmitBulk = async () => {
     if (!isSeller?.() && !isAdmin?.()) {
@@ -392,35 +444,59 @@ function UploadInvoices() {
         <div className="bg-white rounded border p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold">Preview ({totalInvoices} valid rows)</h3>
-            <button disabled={submitting || errors.length>0 || preview.length===0} onClick={handleSubmitBulk} className="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50">
-              {submitting ? 'Submitting...' : 'Submit to System / FBR'}
-            </button>
+            <div className="flex items-center gap-2">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-600"><span className="w-3 h-3 inline-block bg-red-100 border border-red-200"></span> Invalid</label>
+              <label className="inline-flex items-center gap-2 text-sm text-gray-600"><span className="w-3 h-3 inline-block bg-green-50 border border-green-200"></span> Valid</label>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 sticky top-0">
-                  <th className="p-2 text-left">Status</th>
-                  <th className="p-2 text-left">Invoice #</th>
-                  <th className="p-2 text-left">Buyer</th>
-                  <th className="p-2 text-left">Issued Date</th>
-                  <th className="p-2 text-left">Amount</th>
-                  <th className="p-2 text-left">Message</th>
+          <div className="overflow-auto max-h-[60vh] border rounded">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-gray-50 z-10">
+                <tr>
+                  {columnsHelp.map((h) => (
+                    <th key={h} className="p-2 text-left border-b whitespace-nowrap">{h}</th>
+                  ))}
+                  <th className="p-2 text-left border-b">Valid</th>
+                  <th className="p-2 text-left border-b">Selected</th>
+                  <th className="p-2 text-left border-b">Errors</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody>
                 {preview.map((row, idx) => (
-                  <tr key={idx} className={row.__valid ? 'bg-white' : 'bg-red-50'}>
-                    <td className="p-2">{row.__valid ? '✅' : '❌'}</td>
-                    <td className="p-2">{row.invoiceNumber || '-'}</td>
-                    <td className="p-2">{row.buyerName || row.buyerCompany}</td>
-                    <td className="p-2">{row.issuedDate}</td>
-                    <td className="p-2">{Number(row.unitPrice || 0) * Number(row.quantity || 0)}</td>
-                    <td className="p-2 text-xs text-gray-600">{row.__message || '-'}</td>
+                  <tr key={idx} className={`${row.__valid === false ? 'bg-red-50' : row.__valid ? 'bg-green-50' : ''}`}>
+                    {columnsHelp.map((h) => (
+                      <td key={h} className="p-1 border-b align-top">
+                        <input
+                          className="w-full border rounded px-1 py-0.5 text-xs"
+                          value={row[h] ?? ''}
+                          onChange={(e) => handleCellEdit(idx, h, e.target.value)}
+                        />
+                      </td>
+                    ))}
+                    <td className="p-1 border-b">
+                      <input type="checkbox" checked={!!row.__valid} onChange={() => toggleRowFlag(idx, '__valid')} />
+                    </td>
+                    <td className="p-1 border-b">
+                      <input type="checkbox" checked={row.__selected !== false} onChange={() => toggleRowFlag(idx, '__selected')} />
+                    </td>
+                    <td className="p-1 border-b text-[11px] text-red-700">
+                      {Array.isArray(row.__errors) && row.__errors.length ? row.__errors.join(', ') : ''}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="flex items-center gap-2 mt-3">
+            <label className="inline-block px-3 py-2 bg-white border rounded cursor-pointer hover:bg-gray-50">
+              Upload Excel
+              <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
+            </label>
+            <button onClick={uploadForPreview} disabled={!file || uploading} className="px-3 py-2 rounded bg-black text-white disabled:opacity-50">
+              {uploading ? 'Parsing...' : 'Upload Excel'}
+            </button>
+            <button onClick={validateRecords} disabled={!rows.length} className="px-3 py-2 rounded border">Validate Records</button>
+            <button onClick={submitValidated} disabled={!preview.length || submitting} className="px-3 py-2 rounded bg-amber-500 text-white disabled:opacity-50">Submit</button>
           </div>
         </div>
       )}
