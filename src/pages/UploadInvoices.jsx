@@ -274,35 +274,41 @@ function UploadInvoices() {
     }
   };
 
-  const validateRecords = () => {
-    const numericKeys = new Set(['quantity','Rate','totalValues','valueSalesExcludingST','fedPayable','discount']);
-    const requiredKeys = ['UniqueInvoiceID','invoiceType','InvoiceDate','ProductDescription','quantity','Rate'];
-    const v = rows.map(r => {
-      const errors = [];
-      requiredKeys.forEach(k => { if (!String(r[k] ?? '').trim()) errors.push(`${k} is required`); });
-      // basic date check
-      if (r.InvoiceDate && isNaN(Date.parse(r.InvoiceDate))) errors.push('InvoiceDate is invalid');
-      // numeric checks
-      numericKeys.forEach(k => { if (r[k] !== '' && isNaN(Number(r[k]))) errors.push(`${k} must be a number`); });
-      return { ...r, __errors: errors, __valid: errors.length === 0 };
-    });
-    setValidated(v);
-    if (v.every(x => x.__errors.length === 0)) {
+  // Validate on server and normalize flags for the grid
+  const validateRecords = async () => {
+    try {
       setErrors([]);
-      setSuccess('All rows validated');
-    } else {
-      setErrors(['Some rows have validation errors.']);
       setSuccess(null);
+      if (!sellerId) throw new Error('Missing seller/company id');
+      if (!rows.length) throw new Error('Upload Excel first');
+      const companyId = encodeURIComponent(sellerId);
+      const res = await api.post(`/api/invoice/validate/${companyId}`, { rows });
+      const validatedRows = res.data?.validatedRows || res.data?.validated || res.data?.rows || [];
+      const v = validatedRows.map((r) => ({
+        ...r,
+        __valid: r.__valid ?? r.valid ?? r.isValid ?? false,
+        __errors: r.__errors ?? r.errors ?? r.messages ?? [],
+        __selected: r.__selected ?? true,
+      }));
+      setValidated(v);
+      if (v.every(x => (x.__valid === true))) {
+        setSuccess('All rows validated by server');
+      } else {
+        setErrors(['Some rows have validation errors (server).']);
+      }
+    } catch (e) {
+      setErrors([e?.response?.data?.message || e.message || 'Validation failed']);
     }
   };
 
+  // Submit only valid + selected rows; expect server to return results with pdfUrl or pdfPath
   const submitValidated = async () => {
     try {
       setSubmitting(true);
       setErrors([]);
       setSuccess(null);
       if (!sellerId) throw new Error('Missing seller/company id');
-      const toSubmit = preview.filter(r => (r.__valid === true) && r.__selected);
+      const toSubmit = (validated.length ? validated : rows).filter(r => (r.__valid === true) && r.__selected);
       if (!toSubmit.length) throw new Error('No valid rows to submit');
       const companyId = encodeURIComponent(sellerId);
       const res = await api.post(`/api/invoice/submit/${companyId}`, { rows: toSubmit });
