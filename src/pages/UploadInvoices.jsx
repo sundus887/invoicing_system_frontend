@@ -424,15 +424,7 @@ function UploadInvoices() {
         </div>
       </div>
 
-      {/* Columns helper */}
-      <div className="bg-white p-4 rounded border mb-4">
-        <p className="text-sm text-gray-700 mb-2 font-medium">Template columns (first row must be headers):</p>
-        <div className="flex flex-wrap gap-2">
-          {columnsHelp.map((c) => (
-            <span key={c} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded border">{c}</span>
-          ))}
-        </div>
-      </div>
+      {/* Template columns helper removed per request */}
 
       {errors.length > 0 && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded p-3 mb-4">
