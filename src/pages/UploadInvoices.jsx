@@ -1,5 +1,5 @@
 // src/pages/UploadInvoices.jsx
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import generatePDFInvoice from '../components/PDFInvoice';
@@ -54,6 +54,7 @@ function UploadInvoices() {
   const [uploading, setUploading] = useState(false);
   const [uploadId, setUploadId] = useState(null); // optional backend correlation id
   const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Helper: generate a lightweight CSV template locally (no extra deps)
   const downloadCsvTemplate = () => {
@@ -118,6 +119,8 @@ function UploadInvoices() {
     setErrors([]);
     setSuccess(null);
     setServerReport(null);
+    // Auto-parse immediately after picking a file
+    if (f) setTimeout(() => uploadForPreview(), 0);
   };
 
   const handleDrop = (e) => {
@@ -488,14 +491,11 @@ function UploadInvoices() {
             </table>
           </div>
           <div className="flex items-center gap-2 mt-3">
-            <label className="inline-block px-3 py-2 bg-white border rounded cursor-pointer hover:bg-gray-50">
-              Upload Excel
-              <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
-            </label>
-            <button onClick={uploadForPreview} disabled={!file || uploading} className="px-3 py-2 rounded bg-black text-white disabled:opacity-50">
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
+            <button onClick={() => fileInputRef.current?.click()} className="px-3 py-2 rounded bg-black text-white disabled:opacity-50">
               {uploading ? 'Parsing...' : 'Upload Excel'}
             </button>
-            <button onClick={validateRecords} disabled={!rows.length} className="px-3 py-2 rounded border">Validate Records</button>
+            <button onClick={validateRecords} disabled={!rows.length} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700">Validate Records</button>
             <button onClick={submitValidated} disabled={!preview.length || submitting} className="px-3 py-2 rounded bg-amber-500 text-white disabled:opacity-50">Submit</button>
           </div>
         </div>
