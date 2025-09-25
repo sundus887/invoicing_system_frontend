@@ -4,24 +4,39 @@ import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import generatePDFInvoice from '../components/PDFInvoice';
 
-// Seller columns first, then Buyer columns (as requested)
+// Excel template headers (bold in generated .xlsx). Order and labels per latest request.
 const columnsHelp = [
-  'InvoiceType',
-  'IssuedDate (yyyy-mm-dd)',
-  'InvoiceNumber (optional)',
+  'UniqueInvoiceID',
+  'invoiceType',
+  'InvoiceDate',
   'SellerBusinessName',
   'SellerProvince',
   'SellerAddress',
-  'SellerNTNOrCNIC',
-  'SellerSTRN (optional)',
-  'BuyerName',
-  'BuyerSTRN',
-  'BuyerNTN',
-  'Address',
-  'ItemDescription',
-  'Quantity',
-  'UnitPrice',
-  'Discount (optional)',
+  'SellerNTNCNIC',
+  'BuyerNTNCNIC',
+  'BuyerBusinessName',
+  'BuyerProvince',
+  'BuyerAddress',
+  'invoiceRefNo',
+  'BuyerRegistrationType',
+  'ScenarioID',
+  'HsCode',
+  'ProductDescription',
+  'Rate',
+  'uoM',
+  'quantity',
+  'totalValues',
+  'valueSalesExcludingST',
+  'salesTaxApplicable',
+  'fixedNotifiedValueOrRetailPrice',
+  'salesTaxWithheldAtSource',
+  'extraTax',
+  'furtherTax',
+  'sroScheduleNo',
+  'fedPayable',
+  'discount',
+  'saleType',
+  'sroItemSerialNo',
 ];
 
 function UploadInvoices() {
