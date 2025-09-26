@@ -46,6 +46,10 @@ function UploadInvoices() {
   const [file, setFile] = useState(null);
   // Local rows parsed from Excel (editable)
   const [rows, setRows] = useState([]);
+  // Alias states to match requested core flow names
+  const [parsedRows, setParsedRows] = useState([]);
+  const [validatedRows, setValidatedRows] = useState([]);
+  const [allValid, setAllValid] = useState(false);
   const [validated, setValidated] = useState([]);
   const preview = validated.length ? validated : rows;
   const [errors, setErrors] = useState([]); // validation errors from backend
@@ -63,6 +67,7 @@ function UploadInvoices() {
   const [canExport, setCanExport] = useState(false);
   const [exportRows, setExportRows] = useState([]);
   const [jobId, setJobId] = useState(null);
+  const [jobStatus, setJobStatus] = useState(null);
   // Validation summary banner
   const [validationSummary, setValidationSummary] = useState(null);
   // Submission summary (partial success)
@@ -105,9 +110,15 @@ function UploadInvoices() {
         status: extra.status || row.status,
         pdfUrl: extra.pdfUrl || row.pdfUrl,
         pdfBase64: extra.pdfBase64 || row.pdfBase64,
+        qrDataUrl: extra.qrDataUrl || (typeof extra.qr === 'string' && extra.qr.startsWith('data:') ? extra.qr : row.qrDataUrl),
         __errors: Array.isArray(mergedErrors) ? mergedErrors : (mergedErrors ? [String(mergedErrors)] : []),
         __valid: (extra.success === false || extra.status === 'invalid') ? false : (row.__valid ?? true),
       };
+
+  // Simple handler alias to match requested API for export
+  const handleExport = async () => {
+    await exportSubmittedToExcel();
+  };
     });
     if (validated.length) {
       setValidated(prev => applyMerge(prev));
@@ -173,7 +184,7 @@ function UploadInvoices() {
     }
   }
 
-  async function pollInvoiceJob(jobId, { maxWaitMs = 120000 } = {}) {
+  async function pollInvoiceJob(jobId, { maxWaitMs = 120000, onStatus } = {}) {
     const start = Date.now();
     let delay = 1500;
     while (Date.now() - start < maxWaitMs) {
@@ -181,6 +192,7 @@ function UploadInvoices() {
       try {
         const statusRes = await api.get(`/api/invoice/status/${encodeURIComponent(jobId)}`);
         const status = statusRes.data || {};
+        if (onStatus) try { onStatus(status); } catch {}
         if (status.status === 'completed' || status.completed === true) {
           return status.results || status.data || [];
         }
@@ -403,6 +415,9 @@ function UploadInvoices() {
       });
       // If sheet had no headers, initialize empty row with headers
       setRows(out);
+      setParsedRows(out);
+      setValidatedRows([]);
+      setAllValid(false);
     } catch (err) {
       console.error('Local parse error', err);
       setErrors(['Failed to parse Excel. Make sure it uses the provided template headers.']);
@@ -506,6 +521,7 @@ function UploadInvoices() {
         return { ...r, __errors: localErrs, __valid: localErrs.length === 0, __selected: r.__selected ?? true };
       });
       setValidated(preChecked);
+      setValidatedRows(preChecked);
       
       // Try simple validate endpoint first
       let data = null;
@@ -520,8 +536,8 @@ function UploadInvoices() {
         data = res2.data || {};
       }
 
-      // Backend may return different shapes; prefer .rows
-      const validatedRowsRaw = data.rows || data.validatedRows || data.data || [];
+      // Backend may return different shapes; prefer .rows, but also support .results
+      const validatedRowsRaw = data.rows || data.validatedRows || data.results || data.data || [];
 
       // Normalize to objects with our known columns and helper flags (server view)
       const normalized = Array.isArray(validatedRowsRaw) ? validatedRowsRaw.map((r, idx) => {
@@ -544,17 +560,25 @@ function UploadInvoices() {
         if (Array.isArray(local.__errors)) errs.push(...local.__errors);
         if (Array.isArray(srv.__errors)) errs.push(...srv.__errors);
         const isValid = (local.__valid !== false) && (srv.__valid !== false) && errs.length === 0;
-        return { ...local, ...srv, __errors: errs, __valid: isValid };
+        // Merge core identifiers and artifacts
+        const irn = srv.irn || srv.IRN || local.irn;
+        const uuid = srv.uuid || local.uuid;
+        const pdfUrl = srv.pdfUrl || local.pdfUrl;
+        const pdfBase64 = srv.pdfBase64 || local.pdfBase64;
+        const qrDataUrl = srv.qrDataUrl || (typeof srv.qr === 'string' && srv.qr.startsWith('data:') ? srv.qr : local.qrDataUrl);
+        return { ...local, ...srv, irn, uuid, pdfUrl, pdfBase64, qrDataUrl, __errors: errs, __valid: isValid };
       });
 
       // Persist merged validation (avoids flicker if server returned no rows)
       setValidated(mergedWithLocal);
+      setValidatedRows(mergedWithLocal);
 
       // Compute and show summary counts
       const total = (mergedWithLocal || []).length;
       const validCount = (mergedWithLocal || []).filter(x => x.__valid === true && x.__selected !== false).length;
       const invalidCount = total - validCount;
       setValidationSummary({ total, valid: validCount, invalid: invalidCount });
+      setAllValid(total > 0 && validCount === total);
 
       if (mergedWithLocal.length && mergedWithLocal.every(x => x.__valid === true)) {
         setSuccess('All rows validated by server');
@@ -604,6 +628,7 @@ function UploadInvoices() {
         setCanExport(allOk);
         setJobId(submitRes.data?.jobId || null);
         setSubmitResults(immediateResults || []);
+        setJobStatus({ complete: true, results: immediateResults });
         if (allOk) {
           setSuccess('All invoices submitted successfully.');
           setSuccessMessage('All rows validated and submitted successfully.');
@@ -620,7 +645,15 @@ function UploadInvoices() {
 
       // 2) Poll for completion
       setJobId(returnedJobId);
-      const results = await pollInvoiceJob(returnedJobId, { maxWaitMs: 2 * 60 * 1000 });
+      setJobStatus({ complete: false, progress: 0 });
+      const results = await pollInvoiceJob(returnedJobId, {
+        maxWaitMs: 2 * 60 * 1000,
+        onStatus: (s) => {
+          // Accept either numeric progress or derived info
+          const progress = typeof s.progress === 'number' ? s.progress : undefined;
+          setJobStatus({ complete: !!(s.completed || s.complete || s.status==='completed'), progress, ...s });
+        }
+      });
 
       // 3) Download PDFs for successful rows
       let downloaded = 0;
@@ -646,6 +679,7 @@ function UploadInvoices() {
       setSubmitResults(results || []);
       // Merge identifiers and pdf info into preview rows for display
       mergeResultsIntoPreview(results);
+      setJobStatus({ complete: true, results });
       if (allOk) {
         setSuccess('All invoices submitted successfully.');
         setSuccessMessage('All rows validated and submitted successfully.');
@@ -862,6 +896,7 @@ function UploadInvoices() {
                     <th key={h} className="p-2 text-left border-b whitespace-nowrap">{h}</th>
                   ))}
                   <th className="p-2 text-left border-b">IRN/UUID</th>
+                  <th className="p-2 text-left border-b">QR</th>
                   <th className="p-2 text-left border-b">PDF</th>
                   <th className="p-2 text-left border-b">Valid</th>
                   <th className="p-2 text-left border-b">Selected</th>
@@ -882,6 +917,15 @@ function UploadInvoices() {
                     ))}
                     <td className="p-1 border-b text-[11px]">
                       {row.irn || row.IRN || row.uuid || ''}
+                    </td>
+                    <td className="p-1 border-b">
+                      {row.qrDataUrl || (typeof row.qr === 'string' && row.qr.startsWith('data:')) ? (
+                        <a href={row.qrDataUrl || row.qr} target="_blank" rel="noreferrer" title="Open QR">
+                          <img src={row.qrDataUrl || row.qr} alt="QR" className="w-8 h-8 object-contain border rounded" />
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 text-xs">—</span>
+                      )}
                     </td>
                     <td className="p-1 border-b">
                       {(row.pdfBase64 || row.pdfUrl) ? (
