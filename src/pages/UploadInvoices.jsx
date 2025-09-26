@@ -64,6 +64,8 @@ function UploadInvoices() {
   const [jobId, setJobId] = useState(null);
   // Validation summary banner
   const [validationSummary, setValidationSummary] = useState(null);
+  // Submission summary (partial success)
+  const [submitSummary, setSubmitSummary] = useState(null);
  
   // --- Download helpers & polling ---
   function downloadBase64Pdf(base64, fileName = 'invoice.pdf') {
@@ -77,6 +79,41 @@ function UploadInvoices() {
     } catch (e) {
       console.warn('Base64 PDF download failed:', e);
     }
+
+  // Merge result objects (irn/uuid/status/pdf) back into the visible grid rows
+  function mergeResultsIntoPreview(results = []) {
+    if (!Array.isArray(results) || results.length === 0) return;
+    const byKey = new Map();
+    results.forEach((r, idx) => {
+      const key = r.UniqueInvoiceID || r.invoiceRefNo || r.invoiceNumber || idx;
+      byKey.set(String(key), r);
+    });
+    const applyMerge = (arr) => arr.map((row, idx) => {
+      const key = row.UniqueInvoiceID || row.invoiceRefNo || row.invoiceNumber || idx;
+      const extra = byKey.get(String(key)) || results[idx] || {};
+      const mergedErrors = Array.isArray(row.__errors) && row.__errors.length ? row.__errors : (extra.errors || []);
+      return {
+        ...row,
+        irn: extra.irn || extra.IRN || row.irn,
+        uuid: extra.uuid || row.uuid,
+        status: extra.status || row.status,
+        pdfUrl: extra.pdfUrl || row.pdfUrl,
+        pdfBase64: extra.pdfBase64 || row.pdfBase64,
+        __errors: Array.isArray(mergedErrors) ? mergedErrors : (mergedErrors ? [String(mergedErrors)] : []),
+        __valid: (extra.success === false || extra.status === 'invalid') ? false : (row.__valid ?? true),
+      };
+    });
+    if (validated.length) {
+      setValidated(prev => applyMerge(prev));
+    } else {
+      setRows(prev => applyMerge(prev));
+    }
+  }
+
+  function downloadRowPdf(row) {
+    const fileName = row.pdfFileName || `invoice_${row.irn || row.IRN || row.uuid || Date.now()}.pdf`;
+    if (row.pdfBase64) return downloadBase64Pdf(row.pdfBase64, fileName);
+    if (row.pdfUrl) return downloadBlobFromUrl(row.pdfUrl, fileName);
   }
 
   function extractFileNameFromHeaders(headers, fallback = 'invoice.pdf') {
@@ -322,7 +359,7 @@ function UploadInvoices() {
         // helpers
         obj.__row = idx + 2; // considering header row is 1
         obj.__errors = [];
-        obj.__valid = null; // unknown until validation
+        obj.__valid = true; // pre-check as valid; server validation will correct if needed
         obj.__selected = true; // default selected
         return obj;
       });
@@ -469,12 +506,16 @@ function UploadInvoices() {
         setCanExport(allOk);
         setJobId(submitRes.data?.jobId || null);
         if (allOk) {
-          setSuccess('All rows validated and submitted successfully.');
+          setSuccess('All invoices submitted successfully.');
           setSuccessMessage('All rows validated and submitted successfully.');
           setShowSuccessModal(true);
         } else {
-          setSuccess('Submitted successfully');
+          const successCount = immediateResults.filter(r => (r.success !== false) || r.irn || r.IRN || r.uuid || (String(r.status||'').toLowerCase()==='success')).length;
+          setSubmitSummary({ successCount, total: immediateResults.length });
+          setSuccess(`Submitted with errors: ${successCount}/${immediateResults.length} succeeded.`);
         }
+        // Merge identifiers and pdf info into preview rows
+        mergeResultsIntoPreview(immediateResults);
         return;
       }
 
@@ -503,13 +544,16 @@ function UploadInvoices() {
       const merged = toSubmit.map((row, idx) => ({ ...row, ...((results || [])[idx] || {}) }));
       setExportRows(merged);
       setCanExport(allOk);
+      // Merge identifiers and pdf info into preview rows for display
+      mergeResultsIntoPreview(results);
       if (allOk) {
-        const baseMsg = downloaded > 0 ? `All rows validated and submitted successfully. Downloaded ${downloaded} PDF${downloaded > 1 ? 's' : ''}.` : 'All rows validated and submitted successfully.';
-        setSuccess(baseMsg);
+        setSuccess('All invoices submitted successfully.');
         setSuccessMessage('All rows validated and submitted successfully.');
         setShowSuccessModal(true);
       } else {
-        setSuccess(downloaded > 0 ? `Submitted successfully. Downloaded ${downloaded} PDF${downloaded > 1 ? 's' : ''}.` : 'Submitted successfully.');
+        const successCount = (results || []).filter(r => (r.success !== false) || r.irn || r.IRN || r.uuid || (String(r.status||'').toLowerCase()==='success')).length;
+        setSubmitSummary({ successCount, total: (results || []).length });
+        setSuccess(`Submitted with errors: ${successCount}/${(results || []).length} succeeded.`);
       }
     } catch (e) {
       setErrors([e?.response?.data?.message || e.message || 'Submit failed']);
@@ -717,6 +761,8 @@ function UploadInvoices() {
                   {columnsHelp.map((h) => (
                     <th key={h} className="p-2 text-left border-b whitespace-nowrap">{h}</th>
                   ))}
+                  <th className="p-2 text-left border-b">IRN/UUID</th>
+                  <th className="p-2 text-left border-b">PDF</th>
                   <th className="p-2 text-left border-b">Valid</th>
                   <th className="p-2 text-left border-b">Selected</th>
                   <th className="p-2 text-left border-b">Errors</th>
@@ -734,6 +780,22 @@ function UploadInvoices() {
                         />
                       </td>
                     ))}
+                    <td className="p-1 border-b text-[11px]">
+                      {row.irn || row.IRN || row.uuid || ''}
+                    </td>
+                    <td className="p-1 border-b">
+                      {(row.pdfBase64 || row.pdfUrl) ? (
+                        <button
+                          type="button"
+                          onClick={() => downloadRowPdf(row)}
+                          className="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                          PDF
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 text-xs">—</span>
+                      )}
+                    </td>
                     <td className="p-1 border-b">
                       <input type="checkbox" checked={!!row.__valid} onChange={() => toggleRowFlag(idx, '__valid')} />
                     </td>
@@ -775,6 +837,15 @@ function UploadInvoices() {
           <div className="font-semibold">Validation Summary</div>
           <div className="text-sm mt-1">
             Total: <strong>{validationSummary.total}</strong> · Valid: <strong>{validationSummary.valid}</strong> · Invalid: <strong>{validationSummary.invalid}</strong>
+          </div>
+        </div>
+      )}
+
+      {submitSummary && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded p-3 mb-4">
+          <div className="font-semibold">Submission Summary</div>
+          <div className="text-sm mt-1">
+            Succeeded: <strong>{submitSummary.successCount}</strong> / <strong>{submitSummary.total}</strong>
           </div>
         </div>
       )}
