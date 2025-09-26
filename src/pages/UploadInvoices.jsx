@@ -379,8 +379,12 @@ function UploadInvoices() {
         columnsHelp.forEach(h => { if (rowObj[h] === undefined) rowObj[h] = ''; });
         // Attach helpers (preserve if provided)
         rowObj.__row = rowObj.__row ?? (idx + 2);
-        rowObj.__valid = rowObj.__valid ?? rowObj.valid ?? rowObj.isValid ?? false;
-        rowObj.__errors = rowObj.__errors ?? rowObj.errors ?? rowObj.messages ?? [];
+        const errs = rowObj.__errors ?? rowObj.errors ?? rowObj.messages ?? [];
+        rowObj.__errors = Array.isArray(errs) ? errs : (errs ? [String(errs)] : []);
+        // Consider multiple flags; default to true if there are no error hints and no explicit invalid flag
+        const explicitValid = rowObj.__valid ?? rowObj.valid ?? rowObj.isValid ?? rowObj.success;
+        const explicitInvalid = rowObj.invalid === true || rowObj.status === 'invalid' || (Array.isArray(rowObj.__errors) && rowObj.__errors.length > 0);
+        rowObj.__valid = explicitValid !== undefined ? Boolean(explicitValid) : !explicitInvalid;
         rowObj.__selected = rowObj.__selected ?? true;
         return rowObj;
       }) : [];
@@ -704,9 +708,6 @@ function UploadInvoices() {
           </div>
           <div className="flex items-center gap-2 mt-3 flex-wrap">
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
-            <button onClick={() => fileInputRef.current?.click()} className="px-3 py-2 rounded bg-black text-white disabled:opacity-50">
-              {uploading ? 'Parsing...' : 'Upload Excel'}
-            </button>
             <button onClick={validateRecords} disabled={!rows.length || validating} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700">
               {validating ? 'Validating...' : 'Validate Records'}
             </button>
