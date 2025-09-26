@@ -523,18 +523,13 @@ function UploadInvoices() {
       // Backend may return different shapes; prefer .rows
       const validatedRowsRaw = data.rows || data.validatedRows || data.data || [];
 
-      // Normalize to objects with our known columns and helper flags
+      // Normalize to objects with our known columns and helper flags (server view)
       const normalized = Array.isArray(validatedRowsRaw) ? validatedRowsRaw.map((r, idx) => {
-        const rowObj = (r && typeof r === 'object' && !Array.isArray(r))
-          ? { ...r }
-          : {};
-        // Ensure all template columns exist
+        const rowObj = (r && typeof r === 'object' && !Array.isArray(r)) ? { ...r } : {};
         columnsHelp.forEach(h => { if (rowObj[h] === undefined) rowObj[h] = ''; });
-        // Attach helpers (preserve if provided)
         rowObj.__row = rowObj.__row ?? (idx + 2);
         const errs = rowObj.__errors ?? rowObj.errors ?? rowObj.messages ?? [];
         rowObj.__errors = Array.isArray(errs) ? errs : (errs ? [String(errs)] : []);
-        // Consider multiple flags; default to true if there are no error hints and no explicit invalid flag
         const explicitValid = rowObj.__valid ?? rowObj.valid ?? rowObj.isValid ?? rowObj.success;
         const explicitInvalid = rowObj.invalid === true || rowObj.status === 'invalid' || (Array.isArray(rowObj.__errors) && rowObj.__errors.length > 0);
         rowObj.__valid = explicitValid !== undefined ? Boolean(explicitValid) : !explicitInvalid;
@@ -542,15 +537,17 @@ function UploadInvoices() {
         return rowObj;
       }) : [];
 
-      // Keep original rows and just set validated, merging with local results
-      const mergedWithLocal = normalized.map((srv, i) => {
-        const local = preChecked[i] || {};
+      // Merge server over local; iterate preChecked so rows are never dropped
+      const mergedWithLocal = preChecked.map((local, i) => {
+        const srv = (Array.isArray(normalized) && normalized.length) ? (normalized[i] || {}) : {};
         const errs = [];
         if (Array.isArray(local.__errors)) errs.push(...local.__errors);
         if (Array.isArray(srv.__errors)) errs.push(...srv.__errors);
         const isValid = (local.__valid !== false) && (srv.__valid !== false) && errs.length === 0;
         return { ...local, ...srv, __errors: errs, __valid: isValid };
       });
+
+      // Persist merged validation (avoids flicker if server returned no rows)
       setValidated(mergedWithLocal);
 
       // Compute and show summary counts
