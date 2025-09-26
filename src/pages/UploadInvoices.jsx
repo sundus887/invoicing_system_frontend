@@ -78,6 +78,8 @@ function UploadInvoices() {
   const [submitResults, setSubmitResults] = useState([]);
   // Reveal export (validated) only if backend returned any IRN on validate
   const [showValidatedExport, setShowValidatedExport] = useState(false);
+  // Exporting state for spinner
+  const [exporting, setExporting] = useState(false);
  
   // --- Download helpers & polling ---
   function downloadBase64Pdf(base64, fileName = 'invoice.pdf') {
@@ -525,12 +527,12 @@ function UploadInvoices() {
       setValidated(preChecked);
       setValidatedRows(preChecked);
       
-      // Try new invoice-validate route first (returns per-row IRN/QR/PDF when available)
+      // Call the new validate-assign route (returns per-row isValid/errors/assignedInvoiceNo and possibly IRN/QR/PDF)
       let data = null;
       try {
         if (!sellerId) throw new Error('Missing seller/company id');
         const companyId = encodeURIComponent(sellerId);
-        const res = await api.post(`/api/invoice-validate/validate/${companyId}`, { rows });
+        const res = await api.post(`/api/invoices/validate-assign/${companyId}`, { rows });
         data = res.data || {};
       } catch (err1) {
         // Fallback chain: legacy simple validate, then company-scoped
@@ -545,8 +547,8 @@ function UploadInvoices() {
         }
       }
 
-      // Backend may return different shapes; prefer .rows, but also support .results
-      const validatedRowsRaw = data.rows || data.validatedRows || data.results || data.data || [];
+      // Backend may return { results, summary }
+      const validatedRowsRaw = data.results || data.rows || data.validatedRows || data.data || [];
 
       // Normalize to objects with our known columns and helper flags (server view)
       const normalized = Array.isArray(validatedRowsRaw) ? validatedRowsRaw.map((r, idx) => {
@@ -555,10 +557,15 @@ function UploadInvoices() {
         rowObj.__row = rowObj.__row ?? (idx + 2);
         const errs = rowObj.__errors ?? rowObj.errors ?? rowObj.messages ?? [];
         rowObj.__errors = Array.isArray(errs) ? errs : (errs ? [String(errs)] : []);
-        const explicitValid = rowObj.__valid ?? rowObj.valid ?? rowObj.isValid ?? rowObj.success;
+        // Respect API fields isValid/valid
+        const explicitValid = rowObj.__valid ?? rowObj.isValid ?? rowObj.valid ?? rowObj.success;
         const explicitInvalid = rowObj.invalid === true || rowObj.status === 'invalid' || (Array.isArray(rowObj.__errors) && rowObj.__errors.length > 0);
         rowObj.__valid = explicitValid !== undefined ? Boolean(explicitValid) : !explicitInvalid;
         rowObj.__selected = rowObj.__selected ?? true;
+        // Assigned invoice number
+        if (rowObj.assignedInvoiceNo) {
+          rowObj.assignedInvoiceNo = String(rowObj.assignedInvoiceNo);
+        }
         // Carry through IRN/QR/PDF fields from backend if present
         if (rowObj.irn || rowObj.IRN) {
           rowObj.irn = rowObj.irn || rowObj.IRN;
@@ -587,7 +594,8 @@ function UploadInvoices() {
         const pdfUrl = srv.pdfUrl || local.pdfUrl;
         const pdfBase64 = srv.pdfBase64 || local.pdfBase64;
         const qrDataUrl = srv.qrDataUrl || (typeof srv.qr === 'string' && srv.qr.startsWith('data:') ? srv.qr : local.qrDataUrl);
-        return { ...local, ...srv, irn, uuid, pdfUrl, pdfBase64, qrDataUrl, __errors: errs, __valid: isValid };
+        const assignedInvoiceNo = srv.assignedInvoiceNo || local.assignedInvoiceNo || '';
+        return { ...local, ...srv, assignedInvoiceNo, irn, uuid, pdfUrl, pdfBase64, qrDataUrl, __errors: errs, __valid: isValid };
       });
 
       // Persist merged validation (avoids flicker if server returned no rows)
@@ -595,13 +603,12 @@ function UploadInvoices() {
       setValidatedRows(mergedWithLocal);
 
       // Compute and show summary counts
-      const total = (mergedWithLocal || []).length;
-      const validCount = (mergedWithLocal || []).filter(x => x.__valid === true && x.__selected !== false).length;
+      const total = Number(data?.summary?.total ?? (mergedWithLocal || []).length);
+      const validCount = Number(data?.summary?.valid ?? (mergedWithLocal || []).filter(x => x.__valid === true && x.__selected !== false).length);
       const invalidCount = total - validCount;
       setValidationSummary({ total, valid: validCount, invalid: invalidCount });
-      // Reveal export only if any IRN exists in results (post-validate)
-      const hasAnyIrn = (Array.isArray(normalized) ? normalized : []).some(r => r.irn || r.IRN);
-      setShowValidatedExport(hasAnyIrn);
+      // Reveal export when there are validated rows
+      setShowValidatedExport(validCount > 0);
       setAllValid(total > 0 && validCount === total);
 
       if (mergedWithLocal.length && mergedWithLocal.every(x => x.__valid === true)) {
@@ -919,6 +926,7 @@ function UploadInvoices() {
                   {columnsHelp.map((h) => (
                     <th key={h} className="p-2 text-left border-b whitespace-nowrap">{h}</th>
                   ))}
+                  <th className="p-2 text-left border-b">Invoice No</th>
                   <th className="p-2 text-left border-b">IRN/UUID</th>
                   <th className="p-2 text-left border-b">QR</th>
                   <th className="p-2 text-left border-b">PDF</th>
@@ -939,6 +947,9 @@ function UploadInvoices() {
                         />
                       </td>
                     ))}
+                    <td className="p-1 border-b text-[11px]">
+                      {row.assignedInvoiceNo ? row.assignedInvoiceNo : (row.invoiceNo || row.invoiceNumber || row.invoiceRefNo ? (row.invoiceNo || row.invoiceNumber || row.invoiceRefNo) : '(will be assigned)')}
+                    </td>
                     <td className="p-1 border-b text-[11px]">
                       {row.irn || row.IRN || row.uuid || ''}
                     </td>
@@ -987,13 +998,15 @@ function UploadInvoices() {
             )}
             {isValidated && showValidatedExport && (
               <>
-                <button onClick={exportValidatedToExcel} disabled={!validationSummary?.valid} className="px-3 py-2 rounded bg-green-600 text-white disabled:opacity-50 hover:bg-green-700">
-                  Export Excel
+                <button onClick={exportReservedExcel} disabled={!validationSummary?.valid || exporting} className="px-3 py-2 rounded bg-green-600 text-white disabled:opacity-50 hover:bg-green-700">
+                  {exporting ? 'Exporting...' : 'Export'}
                 </button>
               </>
             )}
             {isValidated && (
-              <button onClick={submitValidated} disabled={!validationSummary?.valid || submitting} className="px-3 py-2 rounded bg-amber-500 text-white disabled:opacity-50">Submit</button>
+              <button onClick={submitInvoices} disabled={!validationSummary?.valid || submitting} className="px-3 py-2 rounded bg-amber-500 text-white disabled:opacity-50">
+                {submitting ? 'Submitting...' : 'Submit'}
+              </button>
             )}
             {canExport && (
               <button
