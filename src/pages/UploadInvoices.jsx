@@ -130,7 +130,10 @@ function UploadInvoices() {
   const exportReservedExcel = async () => {
     try {
       setExporting(true);
-      const res = await api.get(`/api/invoices/export`, { responseType: 'blob' });
+      const res = await api.get(`/api/invoices/export`, {
+        responseType: 'blob',
+        params: { status: 'reserved', sellerId },
+      });
       if (!res) throw new Error('No response');
 
       const contentType = res.headers?.['content-type'] || res.headers?.['Content-Type'];
@@ -181,7 +184,7 @@ function UploadInvoices() {
       if (!validRows.length) throw new Error('No valid rows to submit');
       const invoiceNos = validRows.map(r => r.assignedInvoiceNo || r.invoiceNo || r.invoiceNumber || r.invoiceRefNo).filter(Boolean);
       if (!invoiceNos.length) throw new Error('Validated rows have no invoice numbers');
-      const res = await api.post('/api/invoices/submit', { invoiceNos });
+      const res = await api.post('/api/invoices/submit', { sellerId, invoiceNos });
       const ok = res?.data?.success !== false;
       if (ok) {
         setSuccess(res?.data?.message || 'Invoices submitted successfully');
@@ -598,8 +601,11 @@ function UploadInvoices() {
       let data = null;
       try {
         if (!sellerId) throw new Error('Missing seller/company id');
-        const companyId = encodeURIComponent(sellerId);
-        const res = await api.post(`/api/invoices/validate-assign/${companyId}`, { rows });
+        const res = await api.post(
+          `/api/invoices/validate-assign`,
+          { rows, sellerId },
+          { headers: { 'x-seller-id': sellerId } }
+        );
         data = res.data || {};
       } catch (err1) {
         // Fallback chain: legacy simple validate, then company-scoped
