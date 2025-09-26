@@ -23,6 +23,7 @@ const columnsHelp = [
   'HsCode',
   'ProductDescription',
   'Rate',
+  'unitPrice',
   'uoM',
   'quantity',
   'totalValues',
@@ -386,10 +387,17 @@ function UploadInvoices() {
       const out = (json.length ? json : []).map((r, idx) => {
         const obj = {};
         columnsHelp.forEach(h => { obj[h] = r[h] ?? ''; });
+        // Map between Rate and unitPrice to ensure backend gets unitPrice
+        if ((obj.unitPrice === '' || obj.unitPrice === undefined || obj.unitPrice === null) && obj.Rate !== '') {
+          obj.unitPrice = obj.Rate;
+        }
+        if ((obj.Rate === '' || obj.Rate === undefined || obj.Rate === null) && obj.unitPrice !== '') {
+          obj.Rate = obj.unitPrice;
+        }
         // helpers
         obj.__row = idx + 2; // considering header row is 1
         obj.__errors = [];
-        obj.__valid = true; // pre-check as valid; server validation will correct if needed
+        obj.__valid = null; // leave blank; will be set after clicking Validate Records
         obj.__selected = true; // default selected
         return obj;
       });
