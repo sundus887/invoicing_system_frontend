@@ -119,6 +119,61 @@ function UploadInvoices() {
         __valid: (extra.success === false || extra.status === 'invalid') ? false : (row.__valid ?? true),
       };
 
+  // Export validated/reserved rows (post-validate) as Excel
+  const exportReservedExcel = async () => {
+    try {
+      setExporting(true);
+      const res = await api.get(`/api/invoices/export`, {
+        params: { status: 'reserved' },
+        responseType: 'blob',
+      });
+      if (res?.status === 200 && res.data) {
+        const blob = res.data;
+        const fileName = extractFileNameFromHeaders(res.headers, `Reserved_Invoices_${new Date().toISOString().slice(0,10)}.xlsx`);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } else {
+        setErrors(['Export failed.']);
+      }
+    } catch (e) {
+      console.error('Reserved export failed', e);
+      setErrors(['Export failed.']);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Submit validated rows (only valid ones) using assigned invoice numbers or existing numbers
+  const submitInvoices = async () => {
+    try {
+      setSubmitting(true);
+      setErrors([]);
+      setSuccess(null);
+      const source = validated.length ? validated : rows;
+      const validRows = source.filter(r => r.__valid === true && r.__selected !== false);
+      if (!validRows.length) throw new Error('No valid rows to submit');
+      const invoiceNos = validRows.map(r => r.assignedInvoiceNo || r.invoiceNo || r.invoiceNumber || r.invoiceRefNo).filter(Boolean);
+      if (!invoiceNos.length) throw new Error('Validated rows have no invoice numbers');
+      const res = await api.post('/api/invoices/submit', { invoiceNos });
+      const ok = res?.data?.success !== false;
+      if (ok) {
+        setSuccess(res?.data?.message || 'Invoices submitted successfully');
+      } else {
+        setErrors([res?.data?.message || 'Submit failed']);
+      }
+    } catch (e) {
+      setErrors([e?.response?.data?.message || e?.message || 'Submit failed']);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Simple handler alias to match requested API for export
   const handleExport = async () => {
     await exportSubmittedToExcel();
