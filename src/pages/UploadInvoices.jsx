@@ -62,6 +62,8 @@ function UploadInvoices() {
   const [canExport, setCanExport] = useState(false);
   const [exportRows, setExportRows] = useState([]);
   const [jobId, setJobId] = useState(null);
+  // Validation summary banner
+  const [validationSummary, setValidationSummary] = useState(null);
  
   // --- Download helpers & polling ---
   function downloadBase64Pdf(base64, fileName = 'invoice.pdf') {
@@ -186,7 +188,7 @@ function UploadInvoices() {
     setSuccess(null);
     setServerReport(null);
     // Auto-parse immediately after picking a file
-    if (f) setTimeout(() => uploadForPreview(), 0);
+    if (f) setTimeout(() => uploadForPreview({ showMissingFileError: false, fileOverride: f }), 0);
   };
 
   const handleDrop = (e) => {
@@ -203,6 +205,8 @@ function UploadInvoices() {
     setErrors([]);
     setSuccess(null);
     setServerReport(null);
+    // Auto-parse immediately after dropping a file
+    setTimeout(() => uploadForPreview({ showMissingFileError: false, fileOverride: f }), 0);
   };
 
   const handleDragOver = (e) => {
@@ -290,17 +294,24 @@ function UploadInvoices() {
   };
 
   // Parse Excel locally and hydrate editable rows
-  const uploadForPreview = async () => {
+  // opts: { showMissingFileError?: boolean, fileOverride?: File }
+  const uploadForPreview = async (opts = {}) => {
+    const { showMissingFileError = true, fileOverride = null } = opts;
     setErrors([]);
     setSuccess(null);
     setServerReport(null);
     setUploadId(null);
     setValidated([]);
-    if (!file) return setErrors(['Please choose an Excel file first']);
+    setValidationSummary(null);
+    const f = fileOverride || file;
+    if (!f) {
+      if (showMissingFileError) setErrors(['Please choose an Excel file first']);
+      return;
+    }
     try {
       setUploading(true);
       const XLSX = await import('xlsx');
-      const buf = await file.arrayBuffer();
+      const buf = await f.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       // Read with first row as headers
@@ -346,12 +357,24 @@ function UploadInvoices() {
     }
   };
 
+  // Clear preview/grid so user can upload a new sheet easily
+  const clearPreview = () => {
+    setRows([]);
+    setValidated([]);
+    setErrors([]);
+    setSuccess(null);
+    setServerReport(null);
+    setValidationSummary(null);
+    setFile(null);
+  };
+
   // Validate on server (do NOT wipe the original rows; populate `validated` for preview)
   const validateRecords = async () => {
     try {
       setValidating(true);
       setErrors([]);
       setSuccess(null);
+      setValidationSummary(null);
       if (!rows.length) throw new Error('Upload Excel first');
       
       // Try simple validate endpoint first
@@ -392,10 +415,16 @@ function UploadInvoices() {
       // Keep original rows and just set validated, so preview switches to validated
       setValidated(normalized);
 
+      // Compute and show summary counts
+      const total = normalized.length;
+      const validCount = normalized.filter(x => x.__valid === true && x.__selected !== false).length;
+      const invalidCount = total - validCount;
+      setValidationSummary({ total, valid: validCount, invalid: invalidCount });
+
       if (normalized.length && normalized.every(x => x.__valid === true)) {
         setSuccess('All rows validated by server');
       } else if (normalized.some(x => x.__valid === false)) {
-        setErrors(['Some rows have validation errors (server).']);
+        setErrors([`Some rows have validation errors (server). ${validCount}/${total} valid, ${invalidCount} invalid.`]);
       }
     } catch (e) {
       setErrors([e?.response?.data?.message || e?.message || 'Validation failed']);
@@ -410,6 +439,8 @@ function UploadInvoices() {
       setSubmitting(true);
       setErrors([]);
       setSuccess(null);
+      // Hide validation summary once we move to submission
+      setValidationSummary(null);
       if (!sellerId) throw new Error('Missing seller/company id');
       const toSubmit = (validated.length ? validated : rows).filter(r => (r.__valid === true) && r.__selected);
       if (!toSubmit.length) throw new Error('No valid rows to submit');
@@ -484,6 +515,8 @@ function UploadInvoices() {
       setErrors([e?.response?.data?.message || e.message || 'Submit failed']);
     } finally {
       setSubmitting(false);
+      // Ensure summary stays hidden after submit completes
+      setValidationSummary(null);
     }
   };
 
@@ -666,6 +699,15 @@ function UploadInvoices() {
             <div className="flex items-center gap-2">
               <label className="inline-flex items-center gap-2 text-sm text-gray-600"><span className="w-3 h-3 inline-block bg-red-100 border border-red-200"></span> Invalid</label>
               <label className="inline-flex items-center gap-2 text-sm text-gray-600"><span className="w-3 h-3 inline-block bg-green-50 border border-green-200"></span> Valid</label>
+              <button
+                type="button"
+                onClick={clearPreview}
+                className="ml-2 text-gray-500 hover:text-gray-800 border rounded px-2 py-1 text-sm"
+                aria-label="Close preview"
+                title="Close preview"
+              >
+                ×
+              </button>
             </div>
           </div>
           <div className="overflow-auto max-h-[60vh] border rounded">
@@ -726,6 +768,15 @@ function UploadInvoices() {
 
       {success && (
         <div className="bg-green-50 border border-green-200 text-green-800 rounded p-3 mb-4">{success}</div>
+      )}
+
+      {validationSummary && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded p-3 mb-4">
+          <div className="font-semibold">Validation Summary</div>
+          <div className="text-sm mt-1">
+            Total: <strong>{validationSummary.total}</strong> · Valid: <strong>{validationSummary.valid}</strong> · Invalid: <strong>{validationSummary.invalid}</strong>
+          </div>
+        </div>
       )}
 
       {serverReport && (
