@@ -79,6 +79,7 @@ function UploadInvoices() {
     } catch (e) {
       console.warn('Base64 PDF download failed:', e);
     }
+  }
 
   // Merge result objects (irn/uuid/status/pdf) back into the visible grid rows
   function mergeResultsIntoPreview(results = []) {
