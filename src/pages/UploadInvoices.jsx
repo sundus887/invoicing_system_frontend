@@ -118,6 +118,13 @@ function UploadInvoices() {
         __errors: Array.isArray(mergedErrors) ? mergedErrors : (mergedErrors ? [String(mergedErrors)] : []),
         __valid: (extra.success === false || extra.status === 'invalid') ? false : (row.__valid ?? true),
       };
+    });
+    if (validated.length) {
+      setValidated(prev => applyMerge(prev));
+    } else {
+      setRows(prev => applyMerge(prev));
+    }
+  }
 
   // Export validated/reserved rows (post-validate) as Excel
   const exportReservedExcel = async () => {
@@ -178,13 +185,6 @@ function UploadInvoices() {
   const handleExport = async () => {
     await exportSubmittedToExcel();
   };
-    });
-    if (validated.length) {
-      setValidated(prev => applyMerge(prev));
-    } else {
-      setRows(prev => applyMerge(prev));
-    }
-  }
 
   function downloadRowPdf(row) {
     const fileName = row.pdfFileName || `invoice_${row.irn || row.IRN || row.uuid || Date.now()}.pdf`;
