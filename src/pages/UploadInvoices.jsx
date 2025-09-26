@@ -66,6 +66,10 @@ function UploadInvoices() {
   const [validationSummary, setValidationSummary] = useState(null);
   // Submission summary (partial success)
   const [submitSummary, setSubmitSummary] = useState(null);
+  // Track whether a validation pass has occurred for current preview
+  const isValidated = validated.length > 0;
+  // Results returned by submit (pdfUrl, env, irn, success)
+  const [submitResults, setSubmitResults] = useState([]);
  
   // --- Download helpers & polling ---
   function downloadBase64Pdf(base64, fileName = 'invoice.pdf') {
@@ -116,6 +120,31 @@ function UploadInvoices() {
     if (row.pdfBase64) return downloadBase64Pdf(row.pdfBase64, fileName);
     if (row.pdfUrl) return downloadBlobFromUrl(row.pdfUrl, fileName);
   }
+
+  // Export validated (pre-submit) rows to Excel
+  const exportValidatedToExcel = async () => {
+    try {
+      const XLSX = await import('xlsx');
+      const rowsToExport = (validated.length ? validated : rows).filter(r => r.__valid === true && (r.__selected !== false));
+      if (!rowsToExport.length) return;
+      const data = rowsToExport.map((r) => {
+        const o = {};
+        columnsHelp.forEach(h => { o[h] = r[h] ?? ''; });
+        // Include helpful flags
+        o.valid = r.__valid ? 'yes' : 'no';
+        o.errors = Array.isArray(r.__errors) ? r.__errors.join('; ') : (r.__errors || '');
+        return o;
+      });
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Validated');
+      const fileName = `Validated_FBR_Invoices_${new Date().toISOString().slice(0,10)}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (e) {
+      console.error('Export validated Excel failed', e);
+      setErrors(['Export validated Excel failed.']);
+    }
+  };
 
   function extractFileNameFromHeaders(headers, fallback = 'invoice.pdf') {
     const dispo = headers?.["content-disposition"] || headers?.["Content-Disposition"] || headers?.get?.('Content-Disposition') || headers?.get?.('content-disposition');
@@ -406,6 +435,55 @@ function UploadInvoices() {
     setFile(null);
   };
 
+  // --- Client-side validation helper (pre-checks before server) ---
+  function localValidateRow(row) {
+    const errs = [];
+    // Map common names from your example to our sheet columns if present
+    const invoiceNo = row.invoiceNo ?? row.UniqueInvoiceID ?? row.invoiceRefNo;
+    const saleType = row.saleType ?? row.saleType;
+    const fedPayable = row.fedPayable ?? row.fedPayable;
+    // Basic rules (extend as needed)
+    if (!invoiceNo) errs.push('Invoice number missing');
+    if (!saleType) errs.push('Sale type required');
+    if (fedPayable !== undefined && fedPayable !== '' && isNaN(Number(fedPayable))) errs.push('FED payable must be number');
+
+    // Stronger FBR-like rules (optional columns)
+    const invoiceDate = row.invoiceDate ?? row.InvoiceDate;
+    const customerName = row.customerName ?? row.BuyerBusinessName;
+    const customerNTN = row.customerNTN ?? row.BuyerNTNCNIC;
+    const customerCNIC = row.customerCNIC ?? null;
+    if (!invoiceDate) errs.push('Invoice date missing');
+    if (!customerName) errs.push('Customer name required');
+    if (!customerNTN && !customerCNIC) errs.push('Either NTN or CNIC required');
+
+    const quantity = row.quantity;
+    const unitPrice = row.unitPrice ?? row.Rate;
+    const salesValue = row.salesValue ?? row.valueSalesExcludingST;
+    const taxRate = row.taxRate ?? null;
+    const taxAmount = row.taxAmount ?? null;
+    const totalValue = row.totalValue ?? row.totalValues;
+    const totalTax = row.totalTax ?? null;
+    const grossTotal = row.grossTotal ?? null;
+
+    const mustNumber = [
+      ['Quantity', quantity],
+      ['Unit price', unitPrice],
+      ['Sales value', salesValue],
+      ['Tax rate', taxRate],
+      ['Tax amount', taxAmount],
+      ['Total value', totalValue],
+      ['Total tax', totalTax],
+      ['Gross total', grossTotal],
+    ];
+    mustNumber.forEach(([label, v]) => {
+      if (v !== null && v !== undefined && v !== '' && isNaN(Number(v))) {
+        errs.push(`${label} must be number`);
+      }
+    });
+
+    return errs;
+  }
+
   // Validate on server (do NOT wipe the original rows; populate `validated` for preview)
   const validateRecords = async () => {
     try {
@@ -414,6 +492,12 @@ function UploadInvoices() {
       setSuccess(null);
       setValidationSummary(null);
       if (!rows.length) throw new Error('Upload Excel first');
+      // 0) Local pre-checks to drive UX immediately
+      const preChecked = rows.map((r) => {
+        const localErrs = localValidateRow(r);
+        return { ...r, __errors: localErrs, __valid: localErrs.length === 0, __selected: r.__selected ?? true };
+      });
+      setValidated(preChecked);
       
       // Try simple validate endpoint first
       let data = null;
@@ -450,18 +534,26 @@ function UploadInvoices() {
         return rowObj;
       }) : [];
 
-      // Keep original rows and just set validated, so preview switches to validated
-      setValidated(normalized);
+      // Keep original rows and just set validated, merging with local results
+      const mergedWithLocal = normalized.map((srv, i) => {
+        const local = preChecked[i] || {};
+        const errs = [];
+        if (Array.isArray(local.__errors)) errs.push(...local.__errors);
+        if (Array.isArray(srv.__errors)) errs.push(...srv.__errors);
+        const isValid = (local.__valid !== false) && (srv.__valid !== false) && errs.length === 0;
+        return { ...local, ...srv, __errors: errs, __valid: isValid };
+      });
+      setValidated(mergedWithLocal);
 
       // Compute and show summary counts
-      const total = normalized.length;
-      const validCount = normalized.filter(x => x.__valid === true && x.__selected !== false).length;
+      const total = (mergedWithLocal || []).length;
+      const validCount = (mergedWithLocal || []).filter(x => x.__valid === true && x.__selected !== false).length;
       const invalidCount = total - validCount;
       setValidationSummary({ total, valid: validCount, invalid: invalidCount });
 
-      if (normalized.length && normalized.every(x => x.__valid === true)) {
+      if (mergedWithLocal.length && mergedWithLocal.every(x => x.__valid === true)) {
         setSuccess('All rows validated by server');
-      } else if (normalized.some(x => x.__valid === false)) {
+      } else if (mergedWithLocal.some(x => x.__valid === false)) {
         setErrors([`Some rows have validation errors (server). ${validCount}/${total} valid, ${invalidCount} invalid.`]);
       }
     } catch (e) {
@@ -506,6 +598,7 @@ function UploadInvoices() {
         setExportRows(merged);
         setCanExport(allOk);
         setJobId(submitRes.data?.jobId || null);
+        setSubmitResults(immediateResults || []);
         if (allOk) {
           setSuccess('All invoices submitted successfully.');
           setSuccessMessage('All rows validated and submitted successfully.');
@@ -545,6 +638,7 @@ function UploadInvoices() {
       const merged = toSubmit.map((row, idx) => ({ ...row, ...((results || [])[idx] || {}) }));
       setExportRows(merged);
       setCanExport(allOk);
+      setSubmitResults(results || []);
       // Merge identifiers and pdf info into preview rows for display
       mergeResultsIntoPreview(results);
       if (allOk) {
@@ -797,8 +891,8 @@ function UploadInvoices() {
                         <span className="text-gray-400 text-xs">—</span>
                       )}
                     </td>
-                    <td className="p-1 border-b">
-                      <input type="checkbox" checked={!!row.__valid} onChange={() => toggleRowFlag(idx, '__valid')} />
+                    <td className="p-1 border-b text-center">
+                      {row.__valid === true ? '✅' : row.__valid === false ? '❌' : '-'}
                     </td>
                     <td className="p-1 border-b">
                       <input type="checkbox" checked={row.__selected !== false} onChange={() => toggleRowFlag(idx, '__selected')} />
@@ -813,10 +907,19 @@ function UploadInvoices() {
           </div>
           <div className="flex items-center gap-2 mt-3 flex-wrap">
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
-            <button onClick={validateRecords} disabled={!rows.length || validating} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700">
-              {validating ? 'Validating...' : 'Validate Records'}
-            </button>
-            <button onClick={submitValidated} disabled={!preview.length || submitting} className="px-3 py-2 rounded bg-amber-500 text-white disabled:opacity-50">Submit</button>
+            {!isValidated && (
+              <button onClick={validateRecords} disabled={!rows.length || validating} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700">
+                {validating ? 'Validating...' : 'Validate Records'}
+              </button>
+            )}
+            {isValidated && (
+              <>
+                <button onClick={exportValidatedToExcel} disabled={!validationSummary?.valid} className="px-3 py-2 rounded bg-green-600 text-white disabled:opacity-50 hover:bg-green-700">
+                  Export Excel
+                </button>
+                <button onClick={submitValidated} disabled={!validationSummary?.valid || submitting} className="px-3 py-2 rounded bg-amber-500 text-white disabled:opacity-50">Submit</button>
+              </>
+            )}
             {canExport && (
               <button
                 onClick={exportSubmittedToExcel}
@@ -855,6 +958,36 @@ function UploadInvoices() {
         <div className="bg-white rounded shadow p-4">
           <h4 className="text-md font-semibold mb-2">Server Report</h4>
           <pre className="text-xs bg-gray-50 border rounded p-3 overflow-auto max-h-64">{JSON.stringify(serverReport, null, 2)}</pre>
+        </div>
+      )}
+
+      {/* Submit Results: PDF links, env badge, IRN */}
+      {submitResults && submitResults.length > 0 && (
+        <div className="bg-white rounded shadow p-4 mt-4">
+          <h4 className="text-md font-semibold mb-2">Submitted Invoices</h4>
+          <div className="space-y-2 text-sm">
+            {submitResults.map((r, i) => (
+              <div key={r.rowId || r.UniqueInvoiceID || r.invoiceRefNo || i} className="flex flex-wrap items-center gap-3 border-b py-2">
+                {r.success !== false ? (
+                  <>
+                    {r.pdfUrl ? (
+                      <a href={r.pdfUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Download PDF</a>
+                    ) : r.pdfBase64 ? (
+                      <button onClick={() => downloadBase64Pdf(r.pdfBase64, `invoice_${r.irn || r.IRN || r.uuid || Date.now()}.pdf`)} className="text-blue-600 hover:underline">Download PDF</button>
+                    ) : (
+                      <span className="text-gray-500">PDF not available</span>
+                    )}
+                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${String(r.env||'').toLowerCase()==='sandbox' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>
+                      {String(r.env||'').toLowerCase()==='sandbox' ? 'SANDBOX' : 'PROD'}
+                    </span>
+                    <div className="text-gray-700">IRN: <span className="font-mono">{r.irn || r.IRN || '-'}</span></div>
+                  </>
+                ) : (
+                  <div className="text-red-700">Failed: {r.error || r.message || 'Unknown error'}</div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
