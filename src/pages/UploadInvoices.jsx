@@ -130,27 +130,41 @@ function UploadInvoices() {
   const exportReservedExcel = async () => {
     try {
       setExporting(true);
-      const res = await api.get(`/api/invoices/export`, {
-        params: { status: 'reserved' },
-        responseType: 'blob',
-      });
-      if (res?.status === 200 && res.data) {
-        const blob = res.data;
-        const fileName = extractFileNameFromHeaders(res.headers, `Reserved_Invoices_${new Date().toISOString().slice(0,10)}.xlsx`);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-      } else {
-        setErrors(['Export failed.']);
+      const res = await api.get(`/api/invoices/export`, { responseType: 'blob' });
+      if (!res) throw new Error('No response');
+
+      const contentType = res.headers?.['content-type'] || res.headers?.['Content-Type'];
+      const blob = res.data;
+
+      // If server responded with JSON error inside a Blob, surface the real message
+      if (contentType && String(contentType).includes('application/json')) {
+        try {
+          const text = await blob.text();
+          const json = JSON.parse(text);
+          const msg = json.message || json.error || 'Export failed';
+          setErrors([msg]);
+          return;
+        } catch (_) {
+          setErrors(['Export failed']);
+          return;
+        }
       }
+
+      // Otherwise treat as binary Excel
+      const fileName = extractFileNameFromHeaders(res.headers, 'fbr-invoices.xlsx');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || 'fbr-invoices.xlsx';
+      document.body.appendChild(a);
+      // Toast: export started
+      setSuccess('Export started');
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     } catch (e) {
-      console.error('Reserved export failed', e);
-      setErrors(['Export failed.']);
+      const msg = e?.response?.data?.message || e?.message || 'Export failed';
+      setErrors([msg]);
     } finally {
       setExporting(false);
     }
