@@ -340,8 +340,7 @@ function UploadInvoices() {
     setErrors([]);
     setSuccess(null);
     setServerReport(null);
-    // Auto-parse immediately after picking a file
-    if (f) setTimeout(() => uploadForPreview({ showMissingFileError: false, fileOverride: f }), 0);
+    // No auto-parse; user will click "Upload & Preview"
   };
 
   const handleDrop = (e) => {
@@ -358,8 +357,7 @@ function UploadInvoices() {
     setErrors([]);
     setSuccess(null);
     setServerReport(null);
-    // Auto-parse immediately after dropping a file
-    setTimeout(() => uploadForPreview({ showMissingFileError: false, fileOverride: f }), 0);
+    // No auto-parse; user will click "Upload & Preview"
   };
 
   const handleDragOver = (e) => {
