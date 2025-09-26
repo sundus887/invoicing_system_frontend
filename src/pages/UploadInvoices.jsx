@@ -49,12 +49,78 @@ function UploadInvoices() {
   const preview = validated.length ? validated : rows;
   const [errors, setErrors] = useState([]); // validation errors from backend
   const [submitting, setSubmitting] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [success, setSuccess] = useState(null);
   const [serverReport, setServerReport] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadId, setUploadId] = useState(null); // optional backend correlation id
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
+  // Success modal + export state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [canExport, setCanExport] = useState(false);
+  const [exportRows, setExportRows] = useState([]);
+  const [jobId, setJobId] = useState(null);
+ 
+  // --- Download helpers & polling ---
+  function downloadBase64Pdf(base64, fileName = 'invoice.pdf') {
+    try {
+      const link = document.createElement('a');
+      link.href = `data:application/pdf;base64,${base64}`;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (e) {
+      console.warn('Base64 PDF download failed:', e);
+    }
+  }
+
+  function extractFileNameFromHeaders(headers, fallback = 'invoice.pdf') {
+    const dispo = headers?.["content-disposition"] || headers?.["Content-Disposition"] || headers?.get?.('Content-Disposition') || headers?.get?.('content-disposition');
+    if (!dispo) return fallback;
+    const match = String(dispo).match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+    return match ? decodeURIComponent(match[1].replace(/"/g, '')) : fallback;
+  }
+
+  async function downloadBlobFromUrl(url, suggestedName = 'invoice.pdf') {
+    try {
+      // Use axios instance to preserve Authorization header
+      const res = await api.get(url, { responseType: 'blob' });
+      const blob = res.data;
+      const fileName = extractFileNameFromHeaders(res.headers, suggestedName);
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      console.warn('Blob PDF download failed:', e);
+    }
+  }
+
+  async function pollInvoiceJob(jobId, { maxWaitMs = 120000 } = {}) {
+    const start = Date.now();
+    let delay = 1500;
+    while (Date.now() - start < maxWaitMs) {
+      await new Promise(r => setTimeout(r, delay));
+      try {
+        const statusRes = await api.get(`/api/invoice/status/${encodeURIComponent(jobId)}`);
+        const status = statusRes.data || {};
+        if (status.status === 'completed' || status.completed === true) {
+          return status.results || status.data || [];
+        }
+      } catch (e) {
+        // keep polling on transient errors
+      }
+      delay = Math.min(Math.ceil(delay * 1.25), 5000);
+    }
+    throw new Error('Polling timed out before job completed');
+  }
 
   // Helper: generate a lightweight CSV template locally (no extra deps)
   const downloadCsvTemplate = () => {
@@ -262,46 +328,79 @@ function UploadInvoices() {
   const totalInvoices = useMemo(() => preview.filter(r => r.__valid === true && r.__selected).length, [preview]);
 
   const handleCellEdit = (rowIndex, key, value) => {
-    setRows(prev => prev.map((r, i) => i === rowIndex ? { ...r, [key]: value } : r));
-    setValidated([]); // invalidate validated cache when editing
+    if (validated.length) {
+      setValidated(prev => prev.map((r, i) => (i === rowIndex ? { ...r, [key]: value } : r)));
+    } else {
+      setRows(prev => prev.map((r, i) => (i === rowIndex ? { ...r, [key]: value } : r)));
+    }
   };
 
   const toggleRowFlag = (rowIndex, flag) => {
-    if (flag === '__selected') {
-      setRows(prev => prev.map((r, i) => i === rowIndex ? { ...r, __selected: !r.__selected } : r));
-    } else if (flag === '__valid') {
-      setRows(prev => prev.map((r, i) => i === rowIndex ? { ...r, __valid: !r.__valid } : r));
+    const toggleFn = (arrSetter) => arrSetter(prev => prev.map((r, i) => (
+      i === rowIndex ? { ...r, [flag]: !r[flag] } : r
+    )));
+    if (validated.length) {
+      toggleFn(setValidated);
+    } else {
+      toggleFn(setRows);
     }
   };
 
-  // Validate on server and normalize flags for the grid
+  // Validate on server (do NOT wipe the original rows; populate `validated` for preview)
   const validateRecords = async () => {
     try {
+      setValidating(true);
       setErrors([]);
       setSuccess(null);
-      if (!sellerId) throw new Error('Missing seller/company id');
       if (!rows.length) throw new Error('Upload Excel first');
-      const companyId = encodeURIComponent(sellerId);
-      const res = await api.post(`/api/invoice/validate/${companyId}`, { rows });
-      const validatedRows = res.data?.validatedRows || res.data?.validated || res.data?.rows || [];
-      const v = validatedRows.map((r) => ({
-        ...r,
-        __valid: r.__valid ?? r.valid ?? r.isValid ?? false,
-        __errors: r.__errors ?? r.errors ?? r.messages ?? [],
-        __selected: r.__selected ?? true,
-      }));
-      setValidated(v);
-      if (v.every(x => (x.__valid === true))) {
+      
+      // Try simple validate endpoint first
+      let data = null;
+      try {
+        const res = await api.post('/api/validate', { rows });
+        data = res.data || {};
+      } catch (err1) {
+        // Fallback to company-scoped validation if needed
+        if (!sellerId) throw err1;
+        const companyId = encodeURIComponent(sellerId);
+        const res2 = await api.post(`/api/invoice/validate/${companyId}`, { rows });
+        data = res2.data || {};
+      }
+
+      // Backend may return different shapes; prefer .rows
+      const validatedRowsRaw = data.rows || data.validatedRows || data.data || [];
+
+      // Normalize to objects with our known columns and helper flags
+      const normalized = Array.isArray(validatedRowsRaw) ? validatedRowsRaw.map((r, idx) => {
+        const rowObj = (r && typeof r === 'object' && !Array.isArray(r))
+          ? { ...r }
+          : {};
+        // Ensure all template columns exist
+        columnsHelp.forEach(h => { if (rowObj[h] === undefined) rowObj[h] = ''; });
+        // Attach helpers (preserve if provided)
+        rowObj.__row = rowObj.__row ?? (idx + 2);
+        rowObj.__valid = rowObj.__valid ?? rowObj.valid ?? rowObj.isValid ?? false;
+        rowObj.__errors = rowObj.__errors ?? rowObj.errors ?? rowObj.messages ?? [];
+        rowObj.__selected = rowObj.__selected ?? true;
+        return rowObj;
+      }) : [];
+
+      // Keep original rows and just set validated, so preview switches to validated
+      setValidated(normalized);
+
+      if (normalized.length && normalized.every(x => x.__valid === true)) {
         setSuccess('All rows validated by server');
-      } else {
+      } else if (normalized.some(x => x.__valid === false)) {
         setErrors(['Some rows have validation errors (server).']);
       }
     } catch (e) {
-      setErrors([e?.response?.data?.message || e.message || 'Validation failed']);
+      setErrors([e?.response?.data?.message || e?.message || 'Validation failed']);
+    } finally {
+      setValidating(false);
     }
   };
 
-  // Submit only valid + selected rows; expect server to return results with pdfUrl or pdfPath
+  // Submit only valid + selected rows; then poll for results and download PDFs
   const submitValidated = async () => {
     try {
       setSubmitting(true);
@@ -311,13 +410,128 @@ function UploadInvoices() {
       const toSubmit = (validated.length ? validated : rows).filter(r => (r.__valid === true) && r.__selected);
       if (!toSubmit.length) throw new Error('No valid rows to submit');
       const companyId = encodeURIComponent(sellerId);
-      const res = await api.post(`/api/invoice/submit/${companyId}`, { rows: toSubmit });
-      setServerReport(res.data);
-      setSuccess('Submitted successfully');
+
+      // 1) Submit to start background job
+      const submitRes = await api.post(`/api/invoice/submit/${companyId}`, { rows: toSubmit });
+      const returnedJobId = submitRes.data?.jobId || submitRes.data?.id || submitRes.data?.job?.id;
+      if (!returnedJobId) {
+        // Some backends may return results immediately
+        const immediateResults = submitRes.data?.results || submitRes.data?.data || [];
+        setServerReport(submitRes.data);
+        // Attempt downloads if results already present
+        for (const r of immediateResults) {
+          const fileName = r.pdfFileName || `invoice_${r.irn || r.IRN || r.uuid || Date.now()}.pdf`;
+          if (r.pdfBase64) {
+            downloadBase64Pdf(r.pdfBase64, fileName);
+          } else if (r.pdfUrl) {
+            await downloadBlobFromUrl(r.pdfUrl, fileName);
+          }
+        }
+        // Determine success and set export state
+        const allOk = immediateResults.length > 0 && immediateResults.every(r => (r.success !== false) || r.irn || r.IRN || r.uuid || (String(r.status||'').toLowerCase()==='success'));
+        const merged = toSubmit.map((row, idx) => ({ ...row, ...(immediateResults[idx] || {}) }));
+        setExportRows(merged);
+        setCanExport(allOk);
+        setJobId(submitRes.data?.jobId || null);
+        if (allOk) {
+          setSuccess('All rows validated and submitted successfully.');
+          setSuccessMessage('All rows validated and submitted successfully.');
+          setShowSuccessModal(true);
+        } else {
+          setSuccess('Submitted successfully');
+        }
+        return;
+      }
+
+      // 2) Poll for completion
+      setJobId(returnedJobId);
+      const results = await pollInvoiceJob(returnedJobId, { maxWaitMs: 2 * 60 * 1000 });
+
+      // 3) Download PDFs for successful rows
+      let downloaded = 0;
+      for (const r of (results || [])) {
+        if (r.success !== false && (r.pdfBase64 || r.pdfUrl)) {
+          const fileName = r.pdfFileName || `invoice_${r.irn || r.IRN || r.uuid || Date.now()}.pdf`;
+          if (r.pdfBase64) {
+            downloadBase64Pdf(r.pdfBase64, fileName);
+            downloaded++;
+          } else if (r.pdfUrl) {
+            await downloadBlobFromUrl(r.pdfUrl, fileName);
+            downloaded++;
+          }
+        }
+      }
+
+      setServerReport({ jobId: returnedJobId, results });
+      // Prepare export data and success modal
+      const allOk = (results || []).length > 0 && (results || []).every(r => (r.success !== false) || r.irn || r.IRN || r.uuid || (String(r.status||'').toLowerCase()==='success'));
+      const merged = toSubmit.map((row, idx) => ({ ...row, ...((results || [])[idx] || {}) }));
+      setExportRows(merged);
+      setCanExport(allOk);
+      if (allOk) {
+        const baseMsg = downloaded > 0 ? `All rows validated and submitted successfully. Downloaded ${downloaded} PDF${downloaded > 1 ? 's' : ''}.` : 'All rows validated and submitted successfully.';
+        setSuccess(baseMsg);
+        setSuccessMessage('All rows validated and submitted successfully.');
+        setShowSuccessModal(true);
+      } else {
+        setSuccess(downloaded > 0 ? `Submitted successfully. Downloaded ${downloaded} PDF${downloaded > 1 ? 's' : ''}.` : 'Submitted successfully.');
+      }
     } catch (e) {
       setErrors([e?.response?.data?.message || e.message || 'Submit failed']);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Export Submitted rows to Excel
+  const exportSubmittedToExcel = async () => {
+    // Try server-side export first when jobId is available
+    if (jobId) {
+      try {
+        const res = await api.get(`/api/invoice/export/${encodeURIComponent(jobId)}`, { responseType: 'blob' });
+        if (res?.status === 200 && res.data) {
+          const blob = res.data;
+          const fileName = extractFileNameFromHeaders(res.headers, `FBRInvoicesExport_${new Date().toISOString().slice(0,10)}.xlsx`);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          return;
+        }
+      } catch (e) {
+        // fall back to client-side build
+        console.warn('Server export failed, falling back to client XLSX:', e);
+      }
+    }
+
+    // Fallback: client-side XLSX build
+    try {
+      const XLSX = await import('xlsx');
+      const rowsToExport = exportRows && exportRows.length ? exportRows : (validated.length ? validated : rows);
+      if (!rowsToExport.length) return;
+      // Ensure every row has template columns
+      const data = rowsToExport.map((r) => {
+        const o = {};
+        columnsHelp.forEach(h => { o[h] = r[h] ?? ''; });
+        // Include common submission result fields if present
+        o.irn = r.irn || r.IRN || '';
+        o.uuid = r.uuid || '';
+        o.status = r.status || (r.success === false ? 'failed' : (r.success ? 'success' : ''));
+        o.message = Array.isArray(r.__errors) && r.__errors.length ? r.__errors.join('; ') : (r.message || '');
+        return o;
+      });
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Submitted');
+      const fileName = `FBRInvoicesExport_${new Date().toISOString().slice(0,10)}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (e) {
+      console.error('Export Excel failed', e);
+      setErrors(['Export failed.']);
     }
   };
 
@@ -488,13 +702,23 @@ function UploadInvoices() {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center gap-2 mt-3">
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
             <button onClick={() => fileInputRef.current?.click()} className="px-3 py-2 rounded bg-black text-white disabled:opacity-50">
               {uploading ? 'Parsing...' : 'Upload Excel'}
             </button>
-            <button onClick={validateRecords} disabled={!rows.length} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700">Validate Records</button>
+            <button onClick={validateRecords} disabled={!rows.length || validating} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700">
+              {validating ? 'Validating...' : 'Validate Records'}
+            </button>
             <button onClick={submitValidated} disabled={!preview.length || submitting} className="px-3 py-2 rounded bg-amber-500 text-white disabled:opacity-50">Submit</button>
+            {canExport && (
+              <button
+                onClick={exportSubmittedToExcel}
+                className="px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+              >
+                Export Excel
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -507,6 +731,30 @@ function UploadInvoices() {
         <div className="bg-white rounded shadow p-4">
           <h4 className="text-md font-semibold mb-2">Server Report</h4>
           <pre className="text-xs bg-gray-50 border rounded p-3 overflow-auto max-h-64">{JSON.stringify(serverReport, null, 2)}</pre>
+        </div>
+      )}
+
+      {/* Success modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowSuccessModal(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
+            <div className="flex items-start gap-3">
+              <div className="text-blue-600 text-2xl">ℹ</div>
+              <div>
+                <h5 className="font-semibold mb-1">Success</h5>
+                <p className="text-sm text-gray-700">{successMessage || 'All rows validated and submitted successfully.'}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              {canExport && (
+                <button onClick={exportSubmittedToExcel} className="px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700">
+                  Export Excel
+                </button>
+              )}
+              <button onClick={() => setShowSuccessModal(false)} className="px-3 py-2 rounded border">OK</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
