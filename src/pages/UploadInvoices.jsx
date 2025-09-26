@@ -76,6 +76,8 @@ function UploadInvoices() {
   const isValidated = validated.length > 0;
   // Results returned by submit (pdfUrl, env, irn, success)
   const [submitResults, setSubmitResults] = useState([]);
+  // Reveal export (validated) only if backend returned any IRN on validate
+  const [showValidatedExport, setShowValidatedExport] = useState(false);
  
   // --- Download helpers & polling ---
   function downloadBase64Pdf(base64, fileName = 'invoice.pdf') {
@@ -523,17 +525,24 @@ function UploadInvoices() {
       setValidated(preChecked);
       setValidatedRows(preChecked);
       
-      // Try simple validate endpoint first
+      // Try new invoice-validate route first (returns per-row IRN/QR/PDF when available)
       let data = null;
       try {
-        const res = await api.post('/api/validate', { rows });
+        if (!sellerId) throw new Error('Missing seller/company id');
+        const companyId = encodeURIComponent(sellerId);
+        const res = await api.post(`/api/invoice-validate/validate/${companyId}`, { rows });
         data = res.data || {};
       } catch (err1) {
-        // Fallback to company-scoped validation if needed
-        if (!sellerId) throw err1;
-        const companyId = encodeURIComponent(sellerId);
-        const res2 = await api.post(`/api/invoice/validate/${companyId}`, { rows });
-        data = res2.data || {};
+        // Fallback chain: legacy simple validate, then company-scoped
+        try {
+          const resSimple = await api.post('/api/validate', { rows });
+          data = resSimple.data || {};
+        } catch (err2) {
+          if (!sellerId) throw err2;
+          const companyId = encodeURIComponent(sellerId);
+          const res2 = await api.post(`/api/invoice/validate/${companyId}`, { rows });
+          data = res2.data || {};
+        }
       }
 
       // Backend may return different shapes; prefer .rows, but also support .results
@@ -550,12 +559,24 @@ function UploadInvoices() {
         const explicitInvalid = rowObj.invalid === true || rowObj.status === 'invalid' || (Array.isArray(rowObj.__errors) && rowObj.__errors.length > 0);
         rowObj.__valid = explicitValid !== undefined ? Boolean(explicitValid) : !explicitInvalid;
         rowObj.__selected = rowObj.__selected ?? true;
+        // Carry through IRN/QR/PDF fields from backend if present
+        if (rowObj.irn || rowObj.IRN) {
+          rowObj.irn = rowObj.irn || rowObj.IRN;
+        }
+        if (rowObj.qr && typeof rowObj.qr === 'string' && rowObj.qr.startsWith('data:')) {
+          rowObj.qrDataUrl = rowObj.qr;
+        }
         return rowObj;
       }) : [];
 
       // Merge server over local; iterate preChecked so rows are never dropped
       const mergedWithLocal = preChecked.map((local, i) => {
-        const srv = (Array.isArray(normalized) && normalized.length) ? (normalized[i] || {}) : {};
+        // Merge by rowId if present, otherwise by index
+        let srv = {};
+        if (Array.isArray(normalized) && normalized.length) {
+          const s = normalized[i] || {};
+          srv = s;
+        }
         const errs = [];
         if (Array.isArray(local.__errors)) errs.push(...local.__errors);
         if (Array.isArray(srv.__errors)) errs.push(...srv.__errors);
@@ -578,6 +599,9 @@ function UploadInvoices() {
       const validCount = (mergedWithLocal || []).filter(x => x.__valid === true && x.__selected !== false).length;
       const invalidCount = total - validCount;
       setValidationSummary({ total, valid: validCount, invalid: invalidCount });
+      // Reveal export only if any IRN exists in results (post-validate)
+      const hasAnyIrn = (Array.isArray(normalized) ? normalized : []).some(r => r.irn || r.IRN);
+      setShowValidatedExport(hasAnyIrn);
       setAllValid(total > 0 && validCount === total);
 
       if (mergedWithLocal.length && mergedWithLocal.every(x => x.__valid === true)) {
@@ -961,13 +985,15 @@ function UploadInvoices() {
                 {validating ? 'Validating...' : 'Validate Records'}
               </button>
             )}
-            {isValidated && (
+            {isValidated && showValidatedExport && (
               <>
                 <button onClick={exportValidatedToExcel} disabled={!validationSummary?.valid} className="px-3 py-2 rounded bg-green-600 text-white disabled:opacity-50 hover:bg-green-700">
                   Export Excel
                 </button>
-                <button onClick={submitValidated} disabled={!validationSummary?.valid || submitting} className="px-3 py-2 rounded bg-amber-500 text-white disabled:opacity-50">Submit</button>
               </>
+            )}
+            {isValidated && (
+              <button onClick={submitValidated} disabled={!validationSummary?.valid || submitting} className="px-3 py-2 rounded bg-amber-500 text-white disabled:opacity-50">Submit</button>
             )}
             {canExport && (
               <button
