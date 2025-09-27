@@ -1279,6 +1279,22 @@ function UploadInvoices() {
           </div>
           <div className="flex items-center gap-2 mt-3 flex-wrap">
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
+            <button
+              onClick={testCorsCheck}
+              disabled={testingApi}
+              className="px-2 py-1 rounded bg-slate-500 text-white disabled:opacity-50"
+              title="Quick CORS check (credentials included)"
+            >
+              {testingApi ? 'Testing CORS...' : 'Test CORS'}
+            </button>
+            <button
+              onClick={testValidateAssignPing}
+              disabled={testingApi}
+              className="px-2 py-1 rounded bg-slate-600 text-white disabled:opacity-50"
+              title="POST /api/invoices/validate-assign minimal ping"
+            >
+              {testingApi ? 'Testing Validate...' : 'Test Validate'}
+            </button>
             {!isValidated && (
               <button onClick={validateRecords} disabled={!rows.length || validating} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700">
                 {validating ? 'Validating...' : 'Validate Records'}
