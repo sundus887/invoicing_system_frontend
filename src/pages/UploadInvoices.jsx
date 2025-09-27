@@ -772,12 +772,12 @@ function UploadInvoices() {
       } catch (err1) {
         // Fallback chain: legacy simple validate, then company-scoped
         try {
-          const resSimple = await api.post('/api/validate', { rows });
+          const resSimple = await api.post('/api/validate', { rows }, { withCredentials: true });
           data = resSimple.data || {};
         } catch (err2) {
           if (!sellerId) throw err2;
           const companyId = encodeURIComponent(sellerId);
-          const res2 = await api.post(`/api/invoice/validate/${companyId}`, { rows });
+          const res2 = await api.post(`/api/invoice/validate/${companyId}`, { rows }, { withCredentials: true });
           data = res2.data || {};
         }
       }
@@ -852,7 +852,22 @@ function UploadInvoices() {
         setErrors([`Some rows have validation errors (server). ${validCount}/${total} valid, ${invalidCount} invalid.`]);
       }
     } catch (e) {
-      setErrors([e?.response?.data?.message || e?.message || 'Validation failed']);
+      // Provide clearer message for common axios network/CORS issues and JSON error payloads
+      let msg = e?.message || 'Validation failed';
+      try {
+        if (e?.response?.data) {
+          const ct = e?.response?.headers?.['content-type'] || e?.response?.headers?.['Content-Type'];
+          if (typeof e.response.data === 'string') {
+            msg = e.response.data;
+          } else if (ct && String(ct).includes('application/json')) {
+            msg = e.response.data.message || e.response.data.error || msg;
+          }
+        }
+      } catch (_) {}
+      if (msg === 'Network Error') {
+        msg = 'Network Error (likely CORS). Please login and ensure API allows credentials from your Vercel domain.';
+      }
+      setErrors([msg]);
     } finally {
       setValidating(false);
     }
