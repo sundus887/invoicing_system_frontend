@@ -173,24 +173,54 @@ function UploadInvoices() {
     }
   };
 
-  // Submit validated rows (only valid ones) using assigned invoice numbers or existing numbers
+  // Submit validated rows (only valid + selected) and merge results back row-by-row
   const submitInvoices = async () => {
     try {
       setSubmitting(true);
       setErrors([]);
       setSuccess(null);
-      const source = validated.length ? validated : rows;
-      const validRows = source.filter(r => r.__valid === true && r.__selected !== false);
-      if (!validRows.length) throw new Error('No valid rows to submit');
-      const invoiceNos = validRows.map(r => r.assignedInvoiceNo || r.invoiceNo || r.invoiceNumber || r.invoiceRefNo).filter(Boolean);
-      if (!invoiceNos.length) throw new Error('Validated rows have no invoice numbers');
-      const res = await api.post('/api/invoices/submit', { sellerId, invoiceNos });
-      const ok = res?.data?.success !== false;
-      if (ok) {
-        setSuccess(res?.data?.message || 'Invoices submitted successfully');
-      } else {
-        setErrors([res?.data?.message || 'Submit failed']);
+      if (!sellerId) throw new Error('Missing seller/company id');
+      const source = validatedRows.length ? validatedRows : (validated.length ? validated : rows);
+      const rowsToSubmit = source.filter(r => (r.__valid === true || r.valid === true) && r.__selected !== false);
+      if (!rowsToSubmit.length) throw new Error('No valid rows selected');
+
+      const companyId = encodeURIComponent(sellerId);
+      const payload = { company: { id: sellerId }, rows: rowsToSubmit };
+      const resp = await api.post(`/api/invoice/submit/${companyId}`, payload);
+      const ok = resp?.data?.success !== false;
+      if (!ok) {
+        setErrors([resp?.data?.message || 'Submit failed']);
+        return;
       }
+
+      const results = resp?.data?.results || [];
+      // Map results back into validatedRows by rowId or index
+      const byRowId = new Map();
+      results.forEach((r, i) => {
+        const key = String(r.rowId ?? i);
+        byRowId.set(key, r);
+      });
+
+      const updated = source.map((v, i) => {
+        const key = String(v.rowId ?? i);
+        const r = byRowId.get(key);
+        if (!r) return v;
+        const errs = Array.isArray(r.errors) ? r.errors : (r.error ? [String(r.error)] : []);
+        return {
+          ...v,
+          irn: r.irn || v.irn,
+          pdfUrl: r.pdfUrl || v.pdfUrl,
+          __errors: errs,
+          __valid: r.success === false ? false : (v.__valid ?? true),
+        };
+      });
+
+      setValidated(updated);
+      setValidatedRows(updated);
+
+      const allSucceeded = (results || []).length > 0 && (results || []).every(r => r.success !== false);
+      if (allSucceeded) setSuccess('All invoices submitted and assigned IRN');
+      else setErrors(['Some invoices failed - check Errors column']);
     } catch (e) {
       setErrors([e?.response?.data?.message || e?.message || 'Submit failed']);
     } finally {
@@ -468,30 +498,64 @@ function UploadInvoices() {
       const buf = await f.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      // Read with first row as headers
-      const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
-      const out = (json.length ? json : []).map((r, idx) => {
-        const obj = {};
-        columnsHelp.forEach(h => { obj[h] = r[h] ?? ''; });
-        // Map between Rate and unitPrice to ensure backend gets unitPrice
-        if ((obj.unitPrice === '' || obj.unitPrice === undefined || obj.unitPrice === null) && obj.Rate !== '') {
-          obj.unitPrice = obj.Rate;
-        }
-        if ((obj.Rate === '' || obj.Rate === undefined || obj.Rate === null) && obj.unitPrice !== '') {
-          obj.Rate = obj.unitPrice;
-        }
-        // helpers
-        obj.__row = idx + 2; // considering header row is 1
-        obj.__errors = [];
-        obj.__valid = null; // leave blank; will be set after clicking Validate Records
-        obj.__selected = true; // default selected
-        return obj;
-      });
-      // If sheet had no headers, initialize empty row with headers
+      let out = [];
+      try {
+        // Primary: read with first row as headers
+        const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+        out = (json.length ? json : []).map((r, idx) => {
+          const obj = {};
+          columnsHelp.forEach(h => { obj[h] = r[h] ?? r[h.trim?.()] ?? ''; });
+          // Map between Rate and unitPrice to ensure backend gets unitPrice
+          if ((obj.unitPrice === '' || obj.unitPrice === undefined || obj.unitPrice === null) && obj.Rate !== '') {
+            obj.unitPrice = obj.Rate;
+          }
+          if ((obj.Rate === '' || obj.Rate === undefined || obj.Rate === null) && obj.unitPrice !== '') {
+            obj.Rate = obj.unitPrice;
+          }
+          obj.__row = idx + 2;
+          obj.__errors = [];
+          obj.__valid = null;
+          obj.__selected = true;
+          return obj;
+        });
+      } catch (primaryErr) {
+        // Fallback: tolerant header mapping using header:1 (rows as arrays)
+        const rows2D = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, blankrows: false });
+        if (!Array.isArray(rows2D) || rows2D.length < 2) throw primaryErr;
+        const headerRow = rows2D[0].map(v => String(v || '').trim());
+        const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const headerMap = new Map();
+        headerRow.forEach((name, i) => headerMap.set(norm(name), i));
+        const colToIndex = new Map();
+        columnsHelp.forEach(h => {
+          const idxHeader = headerMap.get(norm(h));
+          if (idxHeader !== undefined) colToIndex.set(h, idxHeader);
+        });
+        out = rows2D.slice(1).map((arr, ridx) => {
+          const obj = {};
+          columnsHelp.forEach(h => {
+            const hi = colToIndex.get(h);
+            obj[h] = hi !== undefined ? (arr[hi] ?? '') : '';
+          });
+          // Map between Rate and unitPrice
+          if ((obj.unitPrice === '' || obj.unitPrice === undefined || obj.unitPrice === null) && obj.Rate !== '') {
+            obj.unitPrice = obj.Rate;
+          }
+          if ((obj.Rate === '' || obj.Rate === undefined || obj.Rate === null) && obj.unitPrice !== '') {
+            obj.Rate = obj.unitPrice;
+          }
+          obj.__row = ridx + 2;
+          obj.__errors = [];
+          obj.__valid = null;
+          obj.__selected = true;
+          return obj;
+        });
+      }
       setRows(out);
       setParsedRows(out);
       setValidatedRows([]);
       setAllValid(false);
+      setErrors([]);
     } catch (err) {
       console.error('Local parse error', err);
       setErrors(['Failed to parse Excel. Make sure it uses the provided template headers.']);
