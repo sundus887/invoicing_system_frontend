@@ -766,7 +766,7 @@ function UploadInvoices() {
         const res = await api.post(
           `/api/invoices/validate-assign`,
           { rows, sellerId },
-          { headers: { 'x-seller-id': sellerId } }
+          { headers: { 'x-seller-id': sellerId }, withCredentials: true }
         );
         data = res.data || {};
       } catch (err1) {
@@ -1186,10 +1186,10 @@ function UploadInvoices() {
                       {row.assignedInvoiceNo ? row.assignedInvoiceNo : (row.invoiceNo || row.invoiceNumber || row.invoiceRefNo ? (row.invoiceNo || row.invoiceNumber || row.invoiceRefNo) : '(will be assigned)')}
                     </td>
                     <td className="p-1 border-b text-[11px]">
-                      {row.irn || row.IRN || row.uuid || ''}
+                      {row.__valid === true ? (row.irn || row.IRN || row.uuid || '') : ''}
                     </td>
                     <td className="p-1 border-b">
-                      {row.qrDataUrl || (typeof row.qr === 'string' && row.qr.startsWith('data:')) ? (
+                      {row.__valid === true && (row.qrDataUrl || (typeof row.qr === 'string' && row.qr.startsWith('data:'))) ? (
                         <a href={row.qrDataUrl || row.qr} target="_blank" rel="noreferrer" title="Open QR">
                           <img src={row.qrDataUrl || row.qr} alt="QR" className="w-8 h-8 object-contain border rounded" />
                         </a>
