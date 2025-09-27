@@ -133,6 +133,8 @@ function UploadInvoices() {
       const res = await api.get(`/api/invoices/export`, {
         responseType: 'blob',
         params: { status: 'reserved', sellerId },
+        headers: { 'x-seller-id': sellerId },
+        withCredentials: true,
       });
       if (!res) throw new Error('No response');
 
@@ -166,8 +168,20 @@ function UploadInvoices() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      const msg = e?.response?.data?.message || e?.message || 'Export failed';
-      setErrors([msg]);
+      // Try to extract server message even when axios throws with blob data
+      try {
+        const ct = e?.response?.headers?.['content-type'] || e?.response?.headers?.['Content-Type'];
+        if (e?.response?.data && ct && String(ct).includes('application/json')) {
+          const text = await e.response.data.text();
+          const json = JSON.parse(text);
+          const msg = json.message || json.error || e?.message || 'Export failed';
+          setErrors([msg]);
+          return;
+        }
+      } catch (_) {}
+      const status = e?.response?.status;
+      const fallback = status === 401 ? 'Unauthorized (401). Please login or select a seller account.' : (e?.response?.data?.message || e?.message || 'Export failed');
+      setErrors([fallback]);
     } finally {
       setExporting(false);
     }
@@ -184,25 +198,92 @@ function UploadInvoices() {
       const rowsToSubmit = source.filter(r => (r.__valid === true || r.valid === true) && r.__selected !== false);
       if (!rowsToSubmit.length) throw new Error('No valid rows selected');
 
-      const companyId = encodeURIComponent(sellerId);
-      const payload = { company: { id: sellerId }, rows: rowsToSubmit };
-      const resp = await api.post(`/api/invoice/submit/${companyId}`, payload);
+      // Strategy:
+      // A) If we already have reserved invoice numbers, submit via /api/invoices/submit
+      // B) If not, auto-reserve by calling /api/invoices/validate-assign for the selected rows,
+      //    merge assignedInvoiceNo back, then submit via /api/invoices/submit.
+      let invoiceNos = rowsToSubmit
+        .map(r => r.assignedInvoiceNo || r.invoiceNo || r.invoiceNumber || r.invoiceRefNo)
+        .filter(Boolean);
+
+      // Auto-reserve if missing
+      if (invoiceNos.length === 0) {
+        try {
+          const reserveRes = await api.post(
+            '/api/invoices/validate-assign',
+            { rows: rowsToSubmit, sellerId },
+            { headers: { 'x-seller-id': sellerId } }
+          );
+          const reserveData = reserveRes?.data || {};
+          if (reserveData.success === false) {
+            const msg = reserveData.message || reserveData.error || 'Failed to reserve invoice numbers before submit';
+            setErrors([msg]);
+            return;
+          }
+          const results = reserveData.results || [];
+          const byIdx = new Map(results.map((r, i) => [String(r.__index ?? i), r]));
+          // Merge assignedInvoiceNo into source and rowsToSubmit
+          const merged = source.map((row, i) => {
+            const rr = byIdx.get(String(row.__index ?? i));
+            if (!rr) return row;
+            return { ...row, assignedInvoiceNo: rr.assignedInvoiceNo || row.assignedInvoiceNo };
+          });
+          setValidated(merged);
+          setValidatedRows(merged);
+          // Refresh selection list
+          const refreshed = merged.filter(r => (r.__valid === true || r.valid === true) && r.__selected !== false);
+          invoiceNos = refreshed
+            .map(r => r.assignedInvoiceNo || r.invoiceNo || r.invoiceNumber || r.invoiceRefNo)
+            .filter(Boolean);
+          if (invoiceNos.length === 0) {
+            setErrors(['Validated rows still have no invoice numbers after reservation']);
+            return;
+          }
+        } catch (reserveErr) {
+          const msg = reserveErr?.response?.data?.message || reserveErr?.message || 'Failed to reserve invoice numbers before submit';
+          setErrors([msg]);
+          return;
+        }
+      }
+
+      let resp;
+      try {
+        if (invoiceNos.length > 0) {
+          resp = await api.post(
+            '/api/invoices/submit',
+            { sellerId, invoiceNos },
+            { headers: { 'x-seller-id': sellerId } }
+          );
+        } else {
+          const companyId = encodeURIComponent(sellerId);
+          const payload = { company: { id: sellerId }, rows: rowsToSubmit };
+          resp = await api.post(`/api/invoice/submit/${companyId}`, payload);
+        }
+      } catch (firstErr) {
+        // Fallback path if first attempt failed
+        const companyId = encodeURIComponent(sellerId);
+        const payload = { company: { id: sellerId }, rows: rowsToSubmit };
+        resp = await api.post(`/api/invoice/submit/${companyId}`, payload);
+      }
+
       const ok = resp?.data?.success !== false;
       if (!ok) {
-        setErrors([resp?.data?.message || 'Submit failed']);
+        const d = resp?.data || {};
+        const msg = d.message || d.error || (Array.isArray(d.errors) && d.errors[0]) || 'Submit failed';
+        setErrors([msg]);
         return;
       }
 
-      const results = resp?.data?.results || [];
+      const results = resp?.data?.results || resp?.data?.rows || resp?.data?.data || [];
       // Map results back into validatedRows by rowId or index
       const byRowId = new Map();
       results.forEach((r, i) => {
-        const key = String(r.rowId ?? i);
+        const key = String(r.rowId ?? r.__index ?? i);
         byRowId.set(key, r);
       });
 
       const updated = source.map((v, i) => {
-        const key = String(v.rowId ?? i);
+        const key = String(v.rowId ?? v.__index ?? i);
         const r = byRowId.get(key);
         if (!r) return v;
         const errs = Array.isArray(r.errors) ? r.errors : (r.error ? [String(r.error)] : []);
@@ -222,7 +303,8 @@ function UploadInvoices() {
       if (allSucceeded) setSuccess('All invoices submitted and assigned IRN');
       else setErrors(['Some invoices failed - check Errors column']);
     } catch (e) {
-      setErrors([e?.response?.data?.message || e?.message || 'Submit failed']);
+      const msg = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Submit failed';
+      setErrors([msg]);
     } finally {
       setSubmitting(false);
     }
@@ -512,6 +594,7 @@ function UploadInvoices() {
           if ((obj.Rate === '' || obj.Rate === undefined || obj.Rate === null) && obj.unitPrice !== '') {
             obj.Rate = obj.unitPrice;
           }
+          obj.__index = idx;
           obj.__row = idx + 2;
           obj.__errors = [];
           obj.__valid = null;
@@ -544,6 +627,7 @@ function UploadInvoices() {
           if ((obj.Rate === '' || obj.Rate === undefined || obj.Rate === null) && obj.unitPrice !== '') {
             obj.Rate = obj.unitPrice;
           }
+          obj.__index = ridx;
           obj.__row = ridx + 2;
           obj.__errors = [];
           obj.__valid = null;
