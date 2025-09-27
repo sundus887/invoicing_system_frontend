@@ -252,18 +252,18 @@ function UploadInvoices() {
           resp = await api.post(
             '/api/invoices/submit',
             { sellerId, invoiceNos },
-            { headers: { 'x-seller-id': sellerId } }
+            { headers: { 'x-seller-id': sellerId }, withCredentials: true }
           );
         } else {
           const companyId = encodeURIComponent(sellerId);
           const payload = { company: { id: sellerId }, rows: rowsToSubmit };
-          resp = await api.post(`/api/invoice/submit/${companyId}`, payload);
+          resp = await api.post(`/api/invoice/submit/${companyId}`, payload, { withCredentials: true });
         }
       } catch (firstErr) {
         // Fallback path if first attempt failed
         const companyId = encodeURIComponent(sellerId);
         const payload = { company: { id: sellerId }, rows: rowsToSubmit };
-        resp = await api.post(`/api/invoice/submit/${companyId}`, payload);
+        resp = await api.post(`/api/invoice/submit/${companyId}`, payload, { withCredentials: true });
       }
 
       const ok = resp?.data?.success !== false;
@@ -303,7 +303,21 @@ function UploadInvoices() {
       if (allSucceeded) setSuccess('All invoices submitted and assigned IRN');
       else setErrors(['Some invoices failed - check Errors column']);
     } catch (e) {
-      const msg = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Submit failed';
+      // Axios 'Network Error' often indicates CORS or HTTPS/mixed-content issues
+      let msg = e?.message || 'Submit failed';
+      try {
+        if (e?.response?.data) {
+          const ct = e?.response?.headers?.['content-type'] || e?.response?.headers?.['Content-Type'];
+          if (typeof e.response.data === 'string') {
+            msg = e.response.data;
+          } else if (ct && String(ct).includes('application/json')) {
+            msg = e.response.data.message || e.response.data.error || msg;
+          }
+        }
+      } catch (_) {}
+      if (msg === 'Network Error') {
+        msg = 'Network Error (likely CORS). Please ensure API allows your Vercel domain and credentials.';
+      }
       setErrors([msg]);
     } finally {
       setSubmitting(false);
