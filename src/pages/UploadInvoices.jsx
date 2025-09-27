@@ -80,6 +80,8 @@ function UploadInvoices() {
   const [showValidatedExport, setShowValidatedExport] = useState(false);
   // Exporting state for spinner
   const [exporting, setExporting] = useState(false);
+  // API connectivity test spinner
+  const [testingApi, setTestingApi] = useState(false);
  
   // --- Download helpers & polling ---
   function downloadBase64Pdf(base64, fileName = 'invoice.pdf') {
@@ -327,6 +329,42 @@ function UploadInvoices() {
   // Simple handler alias to match requested API for export
   const handleExport = async () => {
     await exportSubmittedToExcel();
+  };
+
+  // ---------- API Connectivity Tests (per previous brief) ----------
+  const testCorsCheck = async () => {
+    try {
+      setTestingApi(true);
+      const r = await fetch('/api/cors-check', { credentials: 'include' });
+      const json = await r.json();
+      setSuccess(`CORS OK: ${JSON.stringify(json)}`);
+      setErrors([]);
+    } catch (e) {
+      setErrors([e?.message || 'CORS check failed']);
+    } finally {
+      setTestingApi(false);
+    }
+  };
+
+  const testValidateAssignPing = async () => {
+    try {
+      if (!sellerId) { setErrors(['Missing seller/company id']); return; }
+      setTestingApi(true);
+      const r = await fetch('/api/invoices/validate-assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-seller-id': sellerId },
+        credentials: 'include',
+        body: JSON.stringify({ sellerId, rows: [] })
+      });
+      const contentType = r.headers.get('content-type') || '';
+      const body = contentType.includes('application/json') ? await r.json() : await r.text();
+      setSuccess(`Validate-assign reachable: status ${r.status}`);
+      if (r.status >= 400) setErrors([typeof body === 'string' ? body : (body?.message || JSON.stringify(body))]);
+    } catch (e) {
+      setErrors([e?.message || 'Validate-assign test failed']);
+    } finally {
+      setTestingApi(false);
+    }
   };
 
   function downloadRowPdf(row) {
