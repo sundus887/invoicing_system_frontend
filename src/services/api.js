@@ -22,6 +22,21 @@ const api = axios.create({
   },
 });
 
+// Quick verify: warn if misconfigured in production and expose helper
+if (process.env.NODE_ENV === 'production' && /localhost|127\.0\.0\.1/.test(API_URL)) {
+  console.error('❌ Axios baseURL is pointing to localhost in production. Fix to use deployed backend:', API_URL);
+}
+
+export const logApiBase = () => {
+  const msg = `Axios baseURL => ${API_URL}`;
+  if (typeof window !== 'undefined') {
+    // Attach for quick console access: window.logApiBase()
+    window.logApiBase = () => console.log(msg);
+  }
+  console.log(msg);
+  return API_URL;
+};
+
 // Add request interceptor for authentication and debugging
 api.interceptors.request.use(
   (config) => {
