@@ -1,13 +1,12 @@
 import axios from 'axios';
+import { API_BASE } from './apiBase';
 
-// Prefer environment variable, fall back to existing defaults
+// Prefer environment variable, otherwise use centralized API_BASE
 // Set REACT_APP_API_URL in your environment (Vercel project settings) to override
 const envApiUrl = process.env.REACT_APP_API_URL;
-const API_URL = envApiUrl && envApiUrl.trim().length > 0
-  ? envApiUrl.trim().replace(/\/$/, '') // remove trailing slash if any
-  : (process.env.NODE_ENV === 'production'
-      ? 'https://hsoftworks.vercel.app' // Deployed backend URL
-      : 'http://localhost:5000');
+const API_URL = (envApiUrl && envApiUrl.trim().length > 0
+  ? envApiUrl.trim()
+  : API_BASE).replace(/\/$/, '');
 
 if (process.env.NODE_ENV !== 'production') {
   console.log('🚀 Using API URL:', API_URL);
