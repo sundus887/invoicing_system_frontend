@@ -3,6 +3,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import generatePDFInvoice from '../components/PDFInvoice';
+import { apiFetch, API_BASE } from '../services/apiBase';
 
 // Excel template headers (bold in generated .xlsx). Order and labels per latest request.
 const columnsHelp = [
@@ -335,7 +336,7 @@ function UploadInvoices() {
   const testCorsCheck = async () => {
     try {
       setTestingApi(true);
-      const r = await fetch('/api/cors-check', { credentials: 'include' });
+      const r = await apiFetch('/api/cors-check', { credentials: 'include' });
       const json = await r.json();
       setSuccess(`CORS OK: ${JSON.stringify(json)}`);
       setErrors([]);
@@ -350,7 +351,7 @@ function UploadInvoices() {
     try {
       if (!sellerId) { setErrors(['Missing seller/company id']); return; }
       setTestingApi(true);
-      const r = await fetch('/api/invoices/validate-assign', {
+      const r = await apiFetch('/api/invoices/validate-assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-seller-id': sellerId },
         credentials: 'include',
@@ -362,6 +363,26 @@ function UploadInvoices() {
       if (r.status >= 400) setErrors([typeof body === 'string' ? body : (body?.message || JSON.stringify(body))]);
     } catch (e) {
       setErrors([e?.message || 'Validate-assign test failed']);
+    } finally {
+      setTestingApi(false);
+    }
+  };
+
+  // Health GET test for validate endpoint (no body)
+  const testValidateHealthGet = async () => {
+    try {
+      setTestingApi(true);
+      const r = await apiFetch('/api/invoices/validate-assign', { credentials: 'include' });
+      setSuccess(`Validate-assign (GET) reachable: status ${r.status}`);
+      if (!r.ok) {
+        let msg = '';
+        try { msg = await r.text(); } catch { /* ignore */ }
+        setErrors([msg || `Health GET failed with status ${r.status}`]);
+      } else {
+        setErrors([]);
+      }
+    } catch (e) {
+      setErrors([e?.message || 'Validate-assign health GET failed']);
     } finally {
       setTestingApi(false);
     }
@@ -548,7 +569,7 @@ function UploadInvoices() {
 
       // 1) Probe availability (do not parse binary as JSON)
       const q = `sellerId=${encodeURIComponent(sellerId)}`;
-      const probe = await fetch(`/api/company-import/template/status?${q}`, { credentials: 'include' });
+      const probe = await apiFetch(`/api/company-import/template/status?${q}`, { credentials: 'include' });
       let statusJson = { available: false };
       try {
         statusJson = await probe.json();
@@ -564,7 +585,7 @@ function UploadInvoices() {
       }
 
       // 2) Download binary as Blob
-      const res = await fetch(`/api/company-import/template?${q}`, { credentials: 'include' });
+      const res = await apiFetch(`/api/company-import/template?${q}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Template download failed');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -1294,6 +1315,14 @@ function UploadInvoices() {
               title="POST /api/invoices/validate-assign minimal ping"
             >
               {testingApi ? 'Testing Validate...' : 'Test Validate'}
+            </button>
+            <button
+              onClick={testValidateHealthGet}
+              disabled={testingApi}
+              className="px-2 py-1 rounded bg-slate-700 text-white disabled:opacity-50"
+              title={`GET ${API_BASE}/api/invoices/validate-assign (health)`}
+            >
+              {testingApi ? 'Testing Health...' : 'Health GET'}
             </button>
             {!isValidated && (
               <button onClick={validateRecords} disabled={!rows.length || validating} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700">

@@ -17,6 +17,7 @@ if (process.env.NODE_ENV !== 'production') {
 const api = axios.create({
   baseURL: API_URL, // Endpoints below include '/api/...'
   timeout: 15000, // Increased timeout for production
+  withCredentials: true, // Always include cookies for session-based auth
   headers: {
     'Content-Type': 'application/json',
   },
