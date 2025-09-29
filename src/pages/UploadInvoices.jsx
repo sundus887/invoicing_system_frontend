@@ -1354,7 +1354,11 @@ function UploadInvoices() {
       )}
 
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-800 rounded p-3 mb-4">{success}</div>
+        <div className="bg-green-50 border border-green-200 text-green-800 rounded p-3 mb-4">
+          {typeof success === 'string' ? success : (() => {
+            try { return JSON.stringify(success); } catch { return String(success); }
+          })()}
+        </div>
       )}
 
       {validationSummary && (
