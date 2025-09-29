@@ -911,22 +911,12 @@ function UploadInvoices() {
         setErrors([`Some rows have validation errors (server). ${validCount}/${total} valid, ${invalidCount} invalid.`]);
       }
     } catch (e) {
-      // Provide clearer message for common axios network/CORS issues and JSON error payloads
-      let msg = e?.message || 'Validation failed';
-      try {
-        if (e?.response?.data) {
-          const ct = e?.response?.headers?.['content-type'] || e?.response?.headers?.['Content-Type'];
-          if (typeof e.response.data === 'string') {
-            msg = e.response.data;
-          } else if (ct && String(ct).includes('application/json')) {
-            msg = e.response.data.message || e.response.data.error || msg;
-          }
-        }
-      } catch (_) {}
-      if (msg === 'Network Error') {
-        msg = 'Network Error (likely CORS). Please login and ensure API allows credentials from your Vercel domain.';
+      console.error('Validate error:', e);
+      let serverMsg = e?.response?.data?.message || e?.response?.data || e?.message || 'Validation failed';
+      if (typeof serverMsg !== 'string') {
+        try { serverMsg = JSON.stringify(serverMsg); } catch { serverMsg = 'Validation failed'; }
       }
-      setErrors([msg]);
+      setErrors([serverMsg]);
     } finally {
       setValidating(false);
     }
