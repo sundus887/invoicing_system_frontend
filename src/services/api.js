@@ -4,7 +4,21 @@ import { API_BASE } from './apiBase';
 // Prefer environment variable, otherwise use centralized API_BASE
 // Set REACT_APP_API_URL in your environment (Vercel project settings) to override
 const envApiUrl = process.env.REACT_APP_API_URL;
-const useProxy = String(process.env.REACT_APP_USE_PROXY || '').toLowerCase() === 'true';
+// Decide proxy usage:
+// 1) If REACT_APP_USE_PROXY is explicitly set, respect it.
+// 2) Otherwise: use proxy by default in production; skip proxy on localhost (CRA dev).
+let inferredUseProxy = false;
+try {
+  const explicit = process.env.REACT_APP_USE_PROXY;
+  if (explicit !== undefined) {
+    inferredUseProxy = String(explicit).toLowerCase() === 'true';
+  } else if (typeof window !== 'undefined') {
+    inferredUseProxy = window.location.hostname !== 'localhost';
+  } else {
+    inferredUseProxy = process.env.NODE_ENV === 'production';
+  }
+} catch (_) {}
+const useProxy = inferredUseProxy;
 // If proxying, we use same-origin serverless route. Otherwise, prefer env/url from API_BASE
 const API_URL = useProxy
   ? '/api/proxy'

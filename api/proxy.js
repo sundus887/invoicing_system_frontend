@@ -63,13 +63,22 @@ export default async function handler(req, res) {
     if (contentType) res.setHeader('Content-Type', contentType);
     if (contentDisposition) res.setHeader('Content-Disposition', contentDisposition);
 
-    // Forward Set-Cookie (may be multiple)
+    // Forward Set-Cookie (may be multiple) and normalize attributes for first-party usage
     const setCookie = resp.headers.get('set-cookie');
     if (setCookie) {
-      // If multiple cookies are concatenated, split by comma only when followed by space and a token
-      // but many backends send a single header per cookie; Vercel supports array
-      const cookies = Array.isArray(setCookie) ? setCookie : setCookie.split(/,(?=\s*[^;=]+?=)/g);
-      res.setHeader('Set-Cookie', cookies);
+      // Split consolidated Set-Cookie header into individual cookies
+      const cookiesRaw = Array.isArray(setCookie) ? setCookie : setCookie.split(/,(?=\s*[^;=]+?=)/g);
+      const rewritten = cookiesRaw.map((c) => {
+        let out = String(c);
+        // Remove Domain to bind cookie to current host
+        out = out.replace(/;\s*Domain=[^;]+/ig, '');
+        // Ensure Path=/ for broader scope
+        if (!/;\s*Path=/i.test(out)) out += '; Path=/';
+        // If SameSite=None, ensure Secure (Vercel serves over HTTPS)
+        if (/;\s*SameSite=None/i.test(out) && !/;\s*Secure/i.test(out)) out += '; Secure';
+        return out;
+      });
+      res.setHeader('Set-Cookie', rewritten);
     }
 
     const arrayBuf = await resp.arrayBuffer();
