@@ -4,86 +4,79 @@
 
 export default async function handler(req, res) {
   try {
-    const backendBase = 'https://hsoftworks.vercel.app';
-    // Preserve original path and query after /api/proxy
+    const baseBackend = 'https://hsoftworks.vercel.app';
     const originalUrl = req.url || '';
     const targetPath = originalUrl.replace(/^\/api\/proxy/, '') || '/';
-    const targetUrl = backendBase + targetPath;
+    const targetUrl = baseBackend + targetPath;
 
-    // Build headers: forward essential headers including cookies and auth
-    const inbound = req.headers || {};
+    // Clone inbound headers, drop hop-by-hop and host/content-length
+    const inbound = { ...(req.headers || {}) };
+    delete inbound.host;
+    delete inbound['content-length'];
+    delete inbound.connection;
+
+    // Build fetch headers (only forward what the backend needs)
     const headers = new Headers();
-    const passHeaders = [
-      'content-type',
-      'authorization',
-      'x-seller-id',
-      'cookie',
-    ];
+    const passHeaders = ['content-type', 'authorization', 'x-seller-id', 'cookie'];
     passHeaders.forEach((h) => {
       const v = inbound[h] || inbound[h.toLowerCase()];
       if (v) headers.set(h, Array.isArray(v) ? v.join('; ') : String(v));
     });
 
-    // Prepare body: only for non-GET/HEAD
-    let body;
+    // Request method and body
     const method = (req.method || 'GET').toUpperCase();
+    let body;
     if (!['GET', 'HEAD'].includes(method)) {
-      // If content-type is JSON and body is an object, stringify it
       const ct = (inbound['content-type'] || inbound['Content-Type'] || '').toString();
-      if (ct.includes('application/json') && req.body && typeof req.body === 'object') {
-        body = JSON.stringify(req.body);
+      if (ct.includes('application/json')) {
+        // Vercel parses req.body for us when JSON
+        body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
         headers.set('content-type', 'application/json');
       } else if (typeof req.body === 'string' || Buffer.isBuffer(req.body)) {
         body = req.body;
       } else {
-        // As a fallback, try to read raw body from the request stream
-        body = await new Promise((resolve, reject) => {
+        // Fallback: read raw stream
+        body = await new Promise((resolve) => {
           try {
-            let chunks = [];
+            const chunks = [];
             req.on('data', (c) => chunks.push(c));
             req.on('end', () => resolve(Buffer.concat(chunks)));
-            req.on('error', reject);
-          } catch (e) { resolve(undefined); }
+            req.on('error', () => resolve(undefined));
+          } catch {
+            resolve(undefined);
+          }
         });
       }
     }
 
-    const resp = await fetch(targetUrl, {
-      method,
-      headers,
-      body,
-    });
+    const upstream = await fetch(targetUrl, { method, headers, body });
 
-    // Forward status and selected headers
-    res.status(resp.status);
-
-    // Pass through important headers for downloads and JSON
-    const contentType = resp.headers.get('content-type');
-    const contentDisposition = resp.headers.get('content-disposition');
+    // Mirror important headers
+    const contentType = upstream.headers.get('content-type');
+    const contentDisposition = upstream.headers.get('content-disposition');
     if (contentType) res.setHeader('Content-Type', contentType);
     if (contentDisposition) res.setHeader('Content-Disposition', contentDisposition);
 
-    // Forward Set-Cookie (may be multiple) and normalize attributes for first-party usage
-    const setCookie = resp.headers.get('set-cookie');
+    // Normalize Set-Cookie for first-party
+    const setCookie = upstream.headers.get('set-cookie');
     if (setCookie) {
-      // Split consolidated Set-Cookie header into individual cookies
       const cookiesRaw = Array.isArray(setCookie) ? setCookie : setCookie.split(/,(?=\s*[^;=]+?=)/g);
       const rewritten = cookiesRaw.map((c) => {
         let out = String(c);
-        // Remove Domain to bind cookie to current host
         out = out.replace(/;\s*Domain=[^;]+/ig, '');
-        // Ensure Path=/ for broader scope
         if (!/;\s*Path=/i.test(out)) out += '; Path=/';
-        // If SameSite=None, ensure Secure (Vercel serves over HTTPS)
         if (/;\s*SameSite=None/i.test(out) && !/;\s*Secure/i.test(out)) out += '; Secure';
         return out;
       });
       res.setHeader('Set-Cookie', rewritten);
     }
 
-    const arrayBuf = await resp.arrayBuffer();
-    res.send(Buffer.from(arrayBuf));
+    // Status + body passthrough
+    res.status(upstream.status);
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    res.send(buf);
   } catch (err) {
-    res.status(502).json({ success: false, message: 'Proxy error', error: String(err && err.message ? err.message : err) });
+    console.error('Proxy error:', err && (err.stack || err.message || err));
+    res.status(500).json({ success: false, message: 'Proxy error', detail: String(err && err.message ? err.message : err) });
   }
 }
