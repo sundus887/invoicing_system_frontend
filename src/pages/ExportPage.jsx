@@ -107,7 +107,6 @@ function ExportPage() {
       await fetchExportStats(); // Refresh stats
     } catch (err) {
       console.error(`❌ Error during ${type} export:`, err);
-      setError(`Failed to export ${type.toUpperCase()}. Please try again.`);
     } finally {
       setLoading(false);
     }
@@ -131,7 +130,7 @@ function ExportPage() {
 
       // Create CSV headers
       const headers = [
-        'Invoice #',
+        'Invoice No',
         'Client Name',
         'Client NTN',
         'Client STRN',

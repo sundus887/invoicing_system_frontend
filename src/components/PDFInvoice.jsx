@@ -1,5 +1,7 @@
 import jsPDF from 'jspdf';
 
+import QRCode from 'qrcode';
+
 // Function to generate QR code data URL with specific invoice information
 const generateQRCodeDataURL = async (invoice, buyer, seller) => {
   try {
@@ -17,10 +19,13 @@ const generateQRCodeDataURL = async (invoice, buyer, seller) => {
     console.log('📱 QR Code Data:', qrData);
     console.log('📱 QR Code String:', qrDataString);
     
-    // For now, return null to avoid QR code generation issues
-    // The QR code functionality can be added later with proper library setup
-    console.log('⚠️ QR Code generation temporarily disabled - will be implemented with proper library');
-    return null;
+        // Generate a PNG data URL for the QR code
+    const dataUrl = await QRCode.toDataURL(qrDataString, {
+      errorCorrectionLevel: 'M',
+      width: 256,
+      margin: 1
+    });
+    return dataUrl;
     
   } catch (error) {
     console.error('❌ Error generating QR code:', error);
@@ -252,17 +257,14 @@ const generatePDFInvoice = async (invoice, buyer, seller) => {
         console.log('🔄 Adding QR code to PDF (bottom right)...');
         console.log('📄 QR Code Data URL:', qrCodeDataURL.substring(0, 100) + '...');
         
-        // Create image from QR code data URL
-        const qrImage = new Image();
-        qrImage.src = qrCodeDataURL;
-        
+                
         // Position QR code at the bottom right
         const qrSize = 45; // Size of QR code
         const qrX = 145; // X position (right side)
         const qrY = 250; // Y position (bottom)
         
         // Add QR code image
-        doc.addImage(qrImage, 'PNG', qrX, qrY, qrSize, qrSize);
+        doc.addImage(qrCodeDataURL, 'PNG', qrX, qrY, qrSize, qrSize);
         
         // Add QR code label below
         doc.setFontSize(8);
