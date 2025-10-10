@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-<<<<<<< HEAD
 import { Link } from 'react-router-dom';
-=======
->>>>>>> temp-local-changes
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
@@ -18,11 +15,7 @@ function InvoicesPage() {
   // Pagination state
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-<<<<<<< HEAD
 
-=======
-  
->>>>>>> temp-local-changes
   // FBR Submission State
   const [fbrSubmitting, setFbrSubmitting] = useState({});
   const [fbrResult, setFbrResult] = useState({});
@@ -333,14 +326,6 @@ function InvoicesPage() {
       setError('Only sellers can create invoices');
       return;
     }
-<<<<<<< HEAD
-=======
-    
-    if (!fbrAuthStatus) {
-      setError('Please authenticate with FBR first in Seller Settings');
-      return;
-    }
->>>>>>> temp-local-changes
 
     if (!form.buyerId) {
       setError('Please select a buyer');
@@ -372,10 +357,7 @@ function InvoicesPage() {
         status: form.status
       };
 
-<<<<<<< HEAD
       // Create invoice (FBR auth not strictly required for creation)
-=======
->>>>>>> temp-local-changes
       const response = await api.post('/api/invoices', invoiceData);
       console.log('✅ Invoice created successfully:', response.data);
       

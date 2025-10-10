@@ -1,53 +1,36 @@
+import QRCode from 'qrcode';
+
 // Defer loading of jspdf until actually needed to reduce initial bundle size
 
-<<<<<<< HEAD
-// Function to resolve QR code data URL: prefer backend-provided QR image/string
+// Resolve QR code data URL:
+// 1) Prefer backend-provided `invoice.qrCode` (data URL, base64, or http URL)
+// 2) Fallback: generate a QR code locally from key invoice fields
 const resolveQRCodeDataURL = async (invoice, buyer, seller) => {
   try {
     // Prefer backend-provided QR code
     if (invoice?.qrCode) {
       const v = invoice.qrCode;
-      // If already a data URL
       if (typeof v === 'string' && v.startsWith('data:image')) return v;
-      // If base64 without prefix (assume PNG)
       if (typeof v === 'string' && /^[A-Za-z0-9+/=]+$/.test(v)) {
         return `data:image/png;base64,${v}`;
       }
-      // If it's a URL to an image, try to use it directly
       if (typeof v === 'string' && /^https?:\/\//.test(v)) return v;
     }
-    // If no backend QR, we skip generating locally for now
-    console.log('⚠️ No backend QR provided; skipping QR embedding');
-    return null;
-=======
-import QRCode from 'qrcode';
 
-// Function to generate QR code data URL with specific invoice information
-const generateQRCodeDataURL = async (invoice, buyer, seller) => {
-  try {
-    // Create the data string with the required information
+    // Fallback: generate from structured payload
     const qrData = {
       buyerNTN: buyer?.buyerNTN || 'N/A',
       sellerNTN: seller?.sellerNTN || 'N/A',
       invoiceDate: invoice.issuedDate ? new Date(invoice.issuedDate).toLocaleDateString() : 'N/A',
       invoiceNumber: invoice.invoiceNumber || invoice._id?.slice(-6) || 'N/A'
     };
-    
-    // Convert to JSON string
     const qrDataString = JSON.stringify(qrData);
-    
-    console.log('📱 QR Code Data:', qrData);
-    console.log('📱 QR Code String:', qrDataString);
-    
-        // Generate a PNG data URL for the QR code
     const dataUrl = await QRCode.toDataURL(qrDataString, {
       errorCorrectionLevel: 'M',
       width: 256,
-      margin: 1
+      margin: 1,
     });
     return dataUrl;
->>>>>>> temp-local-changes
-    
   } catch (error) {
     console.error('❌ Error generating QR code:', error);
     return null;
