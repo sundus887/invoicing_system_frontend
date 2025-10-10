@@ -1,5 +1,6 @@
 // Defer loading of jspdf until actually needed to reduce initial bundle size
 
+<<<<<<< HEAD
 // Function to resolve QR code data URL: prefer backend-provided QR image/string
 const resolveQRCodeDataURL = async (invoice, buyer, seller) => {
   try {
@@ -18,6 +19,34 @@ const resolveQRCodeDataURL = async (invoice, buyer, seller) => {
     // If no backend QR, we skip generating locally for now
     console.log('⚠️ No backend QR provided; skipping QR embedding');
     return null;
+=======
+import QRCode from 'qrcode';
+
+// Function to generate QR code data URL with specific invoice information
+const generateQRCodeDataURL = async (invoice, buyer, seller) => {
+  try {
+    // Create the data string with the required information
+    const qrData = {
+      buyerNTN: buyer?.buyerNTN || 'N/A',
+      sellerNTN: seller?.sellerNTN || 'N/A',
+      invoiceDate: invoice.issuedDate ? new Date(invoice.issuedDate).toLocaleDateString() : 'N/A',
+      invoiceNumber: invoice.invoiceNumber || invoice._id?.slice(-6) || 'N/A'
+    };
+    
+    // Convert to JSON string
+    const qrDataString = JSON.stringify(qrData);
+    
+    console.log('📱 QR Code Data:', qrData);
+    console.log('📱 QR Code String:', qrDataString);
+    
+        // Generate a PNG data URL for the QR code
+    const dataUrl = await QRCode.toDataURL(qrDataString, {
+      errorCorrectionLevel: 'M',
+      width: 256,
+      margin: 1
+    });
+    return dataUrl;
+>>>>>>> temp-local-changes
     
   } catch (error) {
     console.error('❌ Error generating QR code:', error);
@@ -258,17 +287,14 @@ const generatePDFInvoice = async (invoice, buyer, seller) => {
         console.log('🔄 Adding QR code to PDF (bottom right)...');
         console.log('📄 QR Code Data URL:', qrCodeDataURL.substring(0, 100) + '...');
         
-        // Create image from QR code data URL
-        const qrImage = new Image();
-        qrImage.src = qrCodeDataURL;
-        
+                
         // Position QR code at the bottom right
         const qrSize = 45; // Size of QR code
         const qrX = 145; // X position (right side)
         const qrY = 250; // Y position (bottom)
         
         // Add QR code image
-        doc.addImage(qrImage, 'PNG', qrX, qrY, qrSize, qrSize);
+        doc.addImage(qrCodeDataURL, 'PNG', qrX, qrY, qrSize, qrSize);
         
         // Add QR code label below
         doc.setFontSize(8);

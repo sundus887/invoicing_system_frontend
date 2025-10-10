@@ -25,7 +25,11 @@ const API_URL = useProxy
   : (envApiUrl && envApiUrl.trim().length > 0 ? envApiUrl.trim() : API_BASE).replace(/\/$/, '');
 
 if (process.env.NODE_ENV !== 'production') {
+<<<<<<< HEAD
   console.log('🚀 Using API URL:', API_URL, 'useProxy=', useProxy);
+=======
+  console.log('🚀 Using API URL:', API_URL);
+>>>>>>> temp-local-changes
   console.log('🌍 Environment:', process.env.NODE_ENV);
 }
 
@@ -127,6 +131,7 @@ api.interceptors.response.use(
     
     // Handle authentication errors
     if (error.response?.status === 401) {
+<<<<<<< HEAD
       const url = error.config?.url || '';
       const isAuthEndpoint = url.includes('/api/auth');
       if (process.env.NODE_ENV !== 'production') {
@@ -138,6 +143,13 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
       // For non-auth endpoints, keep token and let the caller handle gracefully
+=======
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('🔐 Authentication error - redirecting to login');
+      }
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+>>>>>>> temp-local-changes
     }
     
     // Handle 500 server errors (timeout issues)

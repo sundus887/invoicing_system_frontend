@@ -10,15 +10,24 @@ const Login = lazy(() => import(/* webpackChunkName: "page-login" */ '../pages/L
 const Dashboard = lazy(() => import(/* webpackChunkName: "page-dashboard" */ '../pages/Dashboard'));
 const Services = lazy(() => import(/* webpackChunkName: "page-services" */ '../pages/Services'));
 const Invoices = lazy(() => import(/* webpackChunkName: "page-invoices" */ '../pages/Invoices'));
+<<<<<<< HEAD
+=======
+const Clients = lazy(() => import(/* webpackChunkName: "page-clients" */ '../pages/Clients'));
+>>>>>>> temp-local-changes
 const TasksPage = lazy(() => import(/* webpackChunkName: "page-tasks" */ '../pages/TasksPage'));
 const ExportPage = lazy(() => import(/* webpackChunkName: "page-export" */ '../pages/ExportPage'));
 const FbrEInvoicing = lazy(() => import(/* webpackChunkName: "page-fbr-e-invoicing" */ '../pages/FbrEInvoicing'));
 const Settings = lazy(() => import(/* webpackChunkName: "page-settings" */ '../pages/Settings'));
+<<<<<<< HEAD
 // Removed SellerConfigurationPage route per request
 const UploadInvoices = lazy(() => import(/* webpackChunkName: "page-upload" */ '../pages/UploadInvoices'));
 const InvoiceHistory = lazy(() => import(/* webpackChunkName: "page-history" */ '../pages/InvoiceHistory'));
 const SellerForm = lazy(() => import(/* webpackChunkName: "page-seller-form" */ '../pages/SellerForm'));
 const InvoiceUploadDirect = lazy(() => import(/* webpackChunkName: "page-upload-direct" */ '../pages/InvoiceUploadDirect'));
+=======
+const UserRoles = lazy(() => import(/* webpackChunkName: "page-user-roles" */ '../pages/UserRoles'));
+const SellerConfigurationPage = lazy(() => import(/* webpackChunkName: "page-seller-config" */ '../pages/SellerConfigurationPage'));
+>>>>>>> temp-local-changes
 
 const AppRoutes = () => {
   const { loading } = useAuth();
@@ -57,6 +66,7 @@ const AppRoutes = () => {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="services" element={<SellerRoute><Services /></SellerRoute>} />
           <Route path="invoices" element={<SellerRoute><Invoices /></SellerRoute>} />
+<<<<<<< HEAD
           <Route path="tasks" element={<SellerRoute><TasksPage /></SellerRoute>} />
           <Route path="export" element={<SellerRoute><ExportPage /></SellerRoute>} />
           <Route path="upload" element={<SellerRoute><UploadInvoices /></SellerRoute>} />
@@ -66,6 +76,15 @@ const AppRoutes = () => {
           <Route path="settings" element={<Settings />} />
           {/* sellers route removed per request */}
           <Route path="seller-register" element={<AdminRoute><SellerForm /></AdminRoute>} />
+=======
+          <Route path="clients" element={<SellerRoute><Clients /></SellerRoute>} />
+          <Route path="tasks" element={<SellerRoute><TasksPage /></SellerRoute>} />
+          <Route path="export" element={<SellerRoute><ExportPage /></SellerRoute>} />
+          <Route path="fbr-e-invoicing" element={<SellerRoute><FbrEInvoicing /></SellerRoute>} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="user-roles" element={<AdminRoute><UserRoles /></AdminRoute>} />
+          <Route path="sellers" element={<AdminRoute><SellerConfigurationPage /></AdminRoute>} />
+>>>>>>> temp-local-changes
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>
