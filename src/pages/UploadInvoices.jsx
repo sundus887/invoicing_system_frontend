@@ -494,8 +494,9 @@ function UploadInvoices() {
       const sheet = workbook.addWorksheet('Template');
 
       // Add header row with bold font
-      const headerRow = sheet.addRow(columnsHelp);
-      headerRow.font = { bold: true };
+      const displayHeaders = columnsHelp.map(h => h === 'UniqueInvoiceID' ? h : (h.charAt(0).toLowerCase() + h.slice(1)));
+const headerRow = sheet.addRow(displayHeaders);
+headerRow.font = { bold: true };
 
       // Set column widths
       sheet.columns = columnsHelp.map(h => ({ width: Math.min(Math.max(h.length + 2, 14), 30) }));
@@ -659,9 +660,16 @@ function UploadInvoices() {
       try {
         // Primary: read with first row as headers
         const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+        // Build tolerant header map (case/space/punctuation-insensitive)
+        const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const firstRowKeys = (json[0] && typeof json[0] === 'object') ? Object.keys(json[0]) : [];
+        const keyMap = new Map(firstRowKeys.map(k => [norm(k), k]));
         out = (json.length ? json : []).map((r, idx) => {
           const obj = {};
-          columnsHelp.forEach(h => { obj[h] = r[h] ?? r[h.trim?.()] ?? ''; });
+          columnsHelp.forEach(h => {
+            const srcKey = keyMap.get(norm(h));
+            obj[h] = srcKey ? (r[srcKey] ?? '') : '';
+          });
           // Map between Rate and unitPrice to ensure backend gets unitPrice
           if ((obj.unitPrice === '' || obj.unitPrice === undefined || obj.unitPrice === null) && obj.Rate !== '') {
             obj.unitPrice = obj.Rate;
