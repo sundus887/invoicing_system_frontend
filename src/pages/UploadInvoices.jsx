@@ -91,6 +91,64 @@ function UploadInvoices() {
   // Normalizer used for tolerant header mapping
   const normKey = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
+  // --- Date normalization helpers ---
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function toYMD(date) {
+    const y = date.getFullYear();
+    const m = pad2(date.getMonth() + 1);
+    const d = pad2(date.getDate());
+    return `${y}/${m}/${d}`; // exact format required
+  }
+  function excelSerialToDate(n) {
+    // Excel's serial date epoch: 1899-12-30
+    const epoch = new Date(Date.UTC(1899, 11, 30));
+    const ms = Math.round((Number(n) || 0) * 86400000);
+    return new Date(epoch.getTime() + ms);
+  }
+  function normalizeDate(val) {
+    if (val == null || val === '') return '';
+    // Date instance
+    if (val instanceof Date && !isNaN(val)) return toYMD(val);
+    // Excel serial number
+    if (typeof val === 'number' && isFinite(val)) {
+      const dt = excelSerialToDate(val);
+      if (!isNaN(dt)) return toYMD(dt);
+    }
+    // String cases
+    const s = String(val).trim();
+    if (!s) return '';
+    // Common patterns: yyyy/mm/dd, yyyy-mm-dd
+    let m = s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+    if (m) {
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      const d = Number(m[3]);
+      if (y > 1900 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+        return `${y}/${pad2(mo)}/${pad2(d)}`;
+      }
+    }
+    // dd/mm/yyyy or mm/dd/yyyy (ambiguous) -> prefer dd/mm/yyyy only if first part > 12
+    m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+    if (m) {
+      let a = Number(m[1]);
+      let b = Number(m[2]);
+      let y = Number(m[3]);
+      if (y < 100) y = 2000 + y; // expand 2-digit year
+      if (a > 12) {
+        // interpret as dd/mm/yyyy
+        const d = a; const mo = b;
+        return `${y}/${pad2(mo)}/${pad2(d)}`;
+      }
+      // otherwise assume mm/dd/yyyy as coming from Excel UI
+      const mo = a; const d = b;
+      return `${y}/${pad2(mo)}/${pad2(d)}`;
+    }
+    // Fallback: Date.parse
+    const parsed = new Date(s);
+    if (!isNaN(parsed)) return toYMD(parsed);
+    return s; // leave as-is if unknown
+  }
+
   // --- Download helpers & polling ---
   function downloadBase64Pdf(base64, fileName = 'invoice.pdf') {
     try {
@@ -664,7 +722,8 @@ headerRow.font = { bold: true };
       let out = [];
       try {
         // Primary: read with first row as headers
-        const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+        // Force consistent date formatting from Excel cells
+        const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, cellDates: true, dateNF: 'yyyy/mm/dd' });
         // Build tolerant header map (case/space/punctuation-insensitive)
         const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const firstRowKeys = (json[0] && typeof json[0] === 'object') ? Object.keys(json[0]) : [];
@@ -681,7 +740,9 @@ headerRow.font = { bold: true };
           const obj = {};
           columnsHelp.forEach(h => {
             const srcKey = keyMap.get(norm(h));
-            obj[h] = srcKey ? (r[srcKey] ?? '') : '';
+            let v = srcKey ? (r[srcKey] ?? '') : '';
+            if (norm(h) === 'invoicedate') v = normalizeDate(v);
+            obj[h] = v;
           });
 
           // Map between Rate and unitPrice to ensure backend gets unitPrice
@@ -700,7 +761,7 @@ headerRow.font = { bold: true };
         });
       } catch (primaryErr) {
         // Fallback: tolerant header mapping using header:1 (rows as arrays)
-        const rows2D = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, blankrows: false });
+        const rows2D = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, blankrows: false, cellDates: true, dateNF: 'yyyy/mm/dd' });
         if (!Array.isArray(rows2D) || rows2D.length < 2) throw primaryErr;
         const headerRow = rows2D[0].map(v => String(v || '').trim());
         const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -724,7 +785,9 @@ headerRow.font = { bold: true };
           const obj = {};
           columnsHelp.forEach(h => {
             const hi = colToIndex.get(h);
-            obj[h] = hi !== undefined ? (arr[hi] ?? '') : '';
+            let v = hi !== undefined ? (arr[hi] ?? '') : '';
+            if (norm(h) === 'invoicedate') v = normalizeDate(v);
+            obj[h] = v;
           });
           // Map between Rate and unitPrice
           if ((obj.unitPrice === '' || obj.unitPrice === undefined || obj.unitPrice === null) && obj.Rate !== '') {
