@@ -97,7 +97,7 @@ function UploadInvoices() {
     const y = date.getFullYear();
     const m = pad2(date.getMonth() + 1);
     const d = pad2(date.getDate());
-    return `${y}-${m}-${d}`; // exact format required (yyyy-mm-dd)
+    return `${d}-${m}-${y}`; // exact format required (dd-mm-yyyy)
   }
   function excelSerialToDate(n) {
     // Excel's serial date epoch: 1899-12-30
@@ -124,7 +124,7 @@ function UploadInvoices() {
       const mo = Number(m[2]);
       const d = Number(m[3]);
       if (y > 1900 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
-        return `${y}-${pad2(mo)}-${pad2(d)}`;
+        return `${pad2(d)}-${pad2(mo)}-${y}`;
       }
     }
     // dd/mm/yyyy or mm/dd/yyyy (ambiguous) -> prefer dd/mm/yyyy only if first part > 12
@@ -137,11 +137,11 @@ function UploadInvoices() {
       if (a > 12) {
         // interpret as dd/mm/yyyy
         const d = a; const mo = b;
-        return `${y}-${pad2(mo)}-${pad2(d)}`;
+        return `${pad2(d)}-${pad2(mo)}-${y}`;
       }
       // otherwise assume mm/dd/yyyy as coming from Excel UI
       const mo = a; const d = b;
-      return `${y}-${pad2(mo)}-${pad2(d)}`;
+      return `${pad2(d)}-${pad2(mo)}-${y}`;
     }
     // Fallback: Date.parse
     const parsed = new Date(s);
@@ -574,12 +574,12 @@ headerRow.font = { bold: true };
       // Set column widths
       sheet.columns = columnsHelp.map(h => ({ width: Math.min(Math.max(h.length + 2, 14), 30) }));
 
-      // Force InvoiceDate column to display as yyyy-mm-dd in Excel UI
+      // Force InvoiceDate column to display as dd-mm-yyyy in Excel UI
       const dateColIndex = columnsHelp.findIndex(h => h === 'InvoiceDate') + 1; // 1-based index for Excel
       if (dateColIndex > 0) {
         const col = sheet.getColumn(dateColIndex);
         // Quote the hyphens so Excel does NOT replace with regional date separator
-        col.numFmt = 'yyyy"-"mm"-"dd';
+        col.numFmt = 'dd"-"mm"-"yyyy';
       }
 
       // Force HsCode column to display as dddd.dddd with trailing zeros (works even for numeric input)
@@ -748,7 +748,7 @@ headerRow.font = { bold: true };
       try {
         // Primary: read with first row as headers
         // Force consistent date formatting from Excel cells
-        const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, cellDates: true, dateNF: 'yyyy-mm-dd' });
+        const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, cellDates: true, dateNF: 'dd-mm-yyyy' });
         // Build tolerant header map (case/space/punctuation-insensitive)
         const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const firstRowKeys = (json[0] && typeof json[0] === 'object') ? Object.keys(json[0]) : [];
@@ -787,7 +787,7 @@ headerRow.font = { bold: true };
         });
       } catch (primaryErr) {
         // Fallback: tolerant header mapping using header:1 (rows as arrays)
-        const rows2D = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, blankrows: false, cellDates: true, dateNF: 'yyyy-mm-dd' });
+        const rows2D = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, blankrows: false, cellDates: true, dateNF: 'dd-mm-yyyy' });
         if (!Array.isArray(rows2D) || rows2D.length < 2) throw primaryErr;
         const headerRow = rows2D[0].map(v => String(v || '').trim());
         const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
