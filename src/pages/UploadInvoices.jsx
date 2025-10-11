@@ -933,7 +933,15 @@ function UploadInvoices() {
         const pdfBase64 = srv.pdfBase64 || local.pdfBase64;
         const qrDataUrl = srv.qrDataUrl || (typeof srv.qr === 'string' && srv.qr.startsWith('data:') ? srv.qr : local.qrDataUrl);
         const assignedInvoiceNo = srv.assignedInvoiceNo || local.assignedInvoiceNo || '';
-        return { ...local, ...srv, assignedInvoiceNo, irn, uuid, pdfUrl, pdfBase64, qrDataUrl, __errors: errs, __valid: isValid };
+        // Only take meaningful server values; do NOT overwrite local with empty strings/null/undefined
+        const merged = { ...local };
+        const isMeaningful = (v) => v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '');
+        Object.keys(srv || {}).forEach((k) => {
+          if (k.startsWith('__')) return; // skip helper flags from server
+          const v = srv[k];
+          if (isMeaningful(v)) merged[k] = v;
+        });
+        return { ...merged, assignedInvoiceNo, irn, uuid, pdfUrl, pdfBase64, qrDataUrl, __errors: errs, __valid: isValid };
       });
 
       // Persist merged validation (avoids flicker if server returned no rows)
