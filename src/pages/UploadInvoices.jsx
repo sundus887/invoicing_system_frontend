@@ -1,4 +1,4 @@
-﻿// src/pages/UploadInvoices.jsx
+// src/pages/UploadInvoices.jsx
 import React, { useMemo, useRef, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -85,7 +85,12 @@ function UploadInvoices() {
   const [exporting, setExporting] = useState(false);
   // API connectivity test spinner
   const [testingApi, setTestingApi] = useState(false);
- 
+  // Preview header rendering from uploaded sheet
+  const [headersOriginal, setHeadersOriginal] = useState([]);
+  const [headerValueKeys, setHeaderValueKeys] = useState([]);
+  // Normalizer used for tolerant header mapping
+  const normKey = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
   // --- Download helpers & polling ---
   function downloadBase64Pdf(base64, fileName = 'invoice.pdf') {
     try {
@@ -580,7 +585,7 @@ headerRow.font = { bold: true };
         // ignore JSON parse errors
       }
       if (!probe.ok || !statusJson?.available) {
-        // Backend not ready â€” gracefully fall back to local generator
+        // Backend not ready Ã¢â‚¬â€ gracefully fall back to local generator
         await downloadExcelTemplateLocal();
         setErrors([]);
         setSuccess('Backend template unavailable. A local Excel template with bold headers has been downloaded.');
@@ -664,12 +669,21 @@ headerRow.font = { bold: true };
         const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const firstRowKeys = (json[0] && typeof json[0] === 'object') ? Object.keys(json[0]) : [];
         const keyMap = new Map(firstRowKeys.map(k => [norm(k), k]));
+        // Capture original headers for display and map to our canonical keys for value binding
+        const headerValueKeysLocal = firstRowKeys.map(h => {
+          const n = norm(h);
+          const canonical = columnsHelp.find(c => norm(c) === n);
+          return canonical || null;
+        });
+        setHeadersOriginal(firstRowKeys);
+        setHeaderValueKeys(headerValueKeysLocal);
         out = (json.length ? json : []).map((r, idx) => {
           const obj = {};
           columnsHelp.forEach(h => {
             const srcKey = keyMap.get(norm(h));
             obj[h] = srcKey ? (r[srcKey] ?? '') : '';
           });
+
           // Map between Rate and unitPrice to ensure backend gets unitPrice
           if ((obj.unitPrice === '' || obj.unitPrice === undefined || obj.unitPrice === null) && obj.Rate !== '') {
             obj.unitPrice = obj.Rate;
@@ -690,6 +704,14 @@ headerRow.font = { bold: true };
         if (!Array.isArray(rows2D) || rows2D.length < 2) throw primaryErr;
         const headerRow = rows2D[0].map(v => String(v || '').trim());
         const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        // Capture original headers and the mapped canonical keys
+        const headerValueKeysLocal = headerRow.map(h => {
+          const n = norm(h);
+          const canonical = columnsHelp.find(c => norm(c) === n);
+          return canonical || null;
+        });
+        setHeadersOriginal(headerRow);
+        setHeaderValueKeys(headerValueKeysLocal);
         const headerMap = new Map();
         headerRow.forEach((name, i) => headerMap.set(norm(name), i));
         const colToIndex = new Map();
@@ -697,6 +719,7 @@ headerRow.font = { bold: true };
           const idxHeader = headerMap.get(norm(h));
           if (idxHeader !== undefined) colToIndex.set(h, idxHeader);
         });
+
         out = rows2D.slice(1).map((arr, ridx) => {
           const obj = {};
           columnsHelp.forEach(h => {
@@ -1250,8 +1273,8 @@ headerRow.font = { bold: true };
           <div className="font-semibold">Submit to System / FBR</div>
           <p className="text-sm text-gray-600 mt-1">Review the preview, then submit valid rows.</p>
           <ul className="text-xs text-gray-600 mt-2 list-disc ml-4 space-y-1">
-            <li>âœ… Valid rows are highlighted</li>
-            <li>âŒ Invalid rows show error messages</li>
+            <li>&#10004; Valid rows are highlighted</li>
+            <li>&#10006; Invalid rows show error messages</li>
             <li>FBR token is handled server-side</li>
           </ul>
         </div>
@@ -1269,157 +1292,142 @@ headerRow.font = { bold: true };
       )}
 
       {preview.length > 0 && (
-        <div className="bg-white rounded border p-4 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold">Preview ({totalInvoices} valid rows)</h3>
-            <div className="flex items-center gap-2">
-              <label className="inline-flex items-center gap-2 text-sm text-gray-600"><span className="w-3 h-3 inline-block bg-red-100 border border-red-200"></span> Invalid</label>
-              <label className="inline-flex items-center gap-2 text-sm text-gray-600"><span className="w-3 h-3 inline-block bg-green-50 border border-green-200"></span> Valid</label>
-              <button
-                type="button"
-                onClick={clearPreview}
-                className="ml-2 text-gray-500 hover:text-gray-800 border rounded px-2 py-1 text-sm"
-                aria-label="Close preview"
-                title="Close preview"
-              >
-                Ã—
-              </button>
-            </div>
-          </div>
-          <div className="overflow-auto max-h-[60vh] border rounded">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-gray-50 z-10">
-                <tr>
-                  {columnsHelp.map((h) => (
-                    <th key={h} className="p-2 text-left border-b whitespace-nowrap">{h}</th>
-                  ))}
-                  <th className="p-2 text-left border-b">Invoice No</th>
-                  <th className="p-2 text-left border-b">IRN/UUID</th>
-                  <th className="p-2 text-left border-b">QR</th>
-                  <th className="p-2 text-left border-b">PDF</th>
-                  <th className="p-2 text-left border-b">Valid</th>
-                  <th className="p-2 text-left border-b">Selected</th>
-                  <th className="p-2 text-left border-b">Errors</th>
-                </tr>
-              </thead>
-              <tbody>
-                {preview.map((row, idx) => (
-                  <tr key={idx} className={`${row.__valid === false ? 'bg-red-50' : row.__valid ? 'bg-green-50' : ''}`}>
-                    {columnsHelp.map((h) => (
-                      <td key={h} className="p-1 border-b align-top">
-                        <input
-                          className="w-full border rounded px-1 py-0.5 text-xs"
-                          value={row[h] ?? ''}
-                          onChange={(e) => handleCellEdit(idx, h, e.target.value)}
-                        />
-                      </td>
-                    ))}
-                    <td className="p-1 border-b text-[11px]">
-                      {row.assignedInvoiceNo ? row.assignedInvoiceNo : (row.invoiceNo || row.invoiceNumber || row.invoiceRefNo ? (row.invoiceNo || row.invoiceNumber || row.invoiceRefNo) : '(will be assigned)')}
-                    </td>
-                    <td className="p-1 border-b text-[11px]">
-                      {row.__valid === true ? (row.irn || row.IRN || row.uuid || '') : ''}
-                    </td>
-                    <td className="p-1 border-b">
-                      {row.__valid === true && (row.qrDataUrl || (typeof row.qr === 'string' && row.qr.startsWith('data:'))) ? (
-                        <a href={row.qrDataUrl || row.qr} target="_blank" rel="noreferrer" title="Open QR">
-                          <img src={row.qrDataUrl || row.qr} alt="QR" className="w-8 h-8 object-contain border rounded" />
-                        </a>
-                      ) : (
-                        <span className="text-gray-400 text-xs">â€”</span>
-                      )}
-                    </td>
-                    <td className="p-1 border-b">
-                      {(row.pdfBase64 || row.pdfUrl) ? (
-                        <button
-                          type="button"
-                          onClick={() => downloadRowPdf(row)}
-                          className="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
-                        >
-                          PDF
-                        </button>
-                      ) : (
-                        <span className="text-gray-400 text-xs">â€”</span>
-                      )}
-                    </td>
-                    <td className="p-1 border-b text-center">
-                      {row.__valid === true ? 'âœ…' : row.__valid === false ? 'âŒ' : '-'}
-                    </td>
-                    <td className="p-1 border-b">
-                      <input type="checkbox" checked={row.__selected !== false} onChange={() => toggleRowFlag(idx, '__selected')} />
-                    </td>
-                    <td className="p-1 border-b text-[11px] text-red-700">
-                      {Array.isArray(row.__errors) && row.__errors.length ? row.__errors.join(', ') : ''}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex items-center gap-2 mt-3 flex-wrap">
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
-            {!isValidated && (
-              <button onClick={validateRecords} disabled={!rows.length || validating} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700">
-                {validating ? 'Validating...' : 'Validate Records'}
-              </button>
-            )}
-            {isValidated && showValidatedExport && (
-              <>
-                <button onClick={exportReservedExcel} disabled={!validationSummary?.valid || exporting} className="px-3 py-2 rounded bg-green-600 text-white disabled:opacity-50 hover:bg-green-700">
-                  {exporting ? 'Exporting...' : 'Export'}
-                </button>
-              </>
-            )}
-            {isValidated && (
-              <button onClick={submitInvoices} disabled={!validationSummary?.valid || submitting} className="px-3 py-2 rounded bg-amber-500 text-white disabled:opacity-50">
-                {submitting ? 'Submitting...' : 'Submit'}
-              </button>
-            )}
-            {canExport && (
-              <button
-                onClick={exportSubmittedToExcel}
-                className="px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700"
-              >
-                Export Excel
-              </button>
-            )}
-          </div>
+    <div className="bg-white rounded border p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-semibold">Preview ({totalInvoices} valid rows)</h3>
+        <div className="flex items-center gap-2">
+          <label className="inline-flex items-center gap-2 text-sm text-gray-600"><span className="w-3 h-3 inline-block bg-red-100 border border-red-200"></span> Invalid</label>
+          <label className="inline-flex items-center gap-2 text-sm text-gray-600"><span className="w-3 h-3 inline-block bg-green-50 border border-green-200"></span> Valid</label>
+          <button
+            type="button"
+            onClick={clearPreview}
+            className="ml-2 text-gray-500 hover:text-gray-800 border rounded px-2 py-1 text-sm"
+            aria-label="Close preview"
+            title="Close preview"
+          >
+            x
+          </button>
         </div>
-      )}
+      </div>
 
+      <div className="overflow-auto max-h-[60vh] border rounded">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-gray-50 z-10">
+            <tr>
+              {(headersOriginal.length ? headersOriginal : columnsHelp).map((h, i) => (
+                <th key={i} className="p-2 text-left border-b whitespace-nowrap">{h}</th>
+              ))}
+              <th className="p-2 text-left border-b">Invoice No</th>
+              <th className="p-2 text-left border-b">IRN/UUID</th>
+              <th className="p-2 text-left border-b">QR</th>
+              <th className="p-2 text-left border-b">PDF</th>
+              <th className="p-2 text-left border-b">Valid</th>
+              <th className="p-2 text-left border-b">Selected</th>
+              <th className="p-2 text-left border-b">Errors</th>
+            </tr>
+          </thead>
+          <tbody>
+            {preview.map((row, idx) => (
+              <tr key={idx} className={`${row.__valid === false ? 'bg-red-50' : row.__valid ? 'bg-green-50' : ''}`}>
+                {(headersOriginal.length ? headerValueKeys : columnsHelp).map((key, colIdx) => (
+                  <td key={colIdx} className="p-1 border-b align-top">
+                    <input
+                      className="w-full border rounded px-1 py-0.5 text-xs"
+                      value={key ? (row[key] ?? '') : ''}
+                      onChange={(e) => key && handleCellEdit(idx, key, e.target.value)}
+                      disabled={!key}
+                      title={!key ? 'Unrecognized column header' : undefined}
+                    />
+                  </td>
+                ))}
+                <td className="p-1 border-b text-[11px]">
+                  {row.assignedInvoiceNo ? row.assignedInvoiceNo : (row.invoiceNo || row.invoiceNumber || row.invoiceRefNo ? (row.invoiceNo || row.invoiceNumber || row.invoiceRefNo) : '(will be assigned)')}
+                </td>
+                <td className="p-1 border-b text-[11px]">
+                  {row.__valid === true ? (row.irn || row.IRN || row.uuid || '') : ''}
+                </td>
+                <td className="p-1 border-b">
+                  {row.__valid === true && (row.qrDataUrl || (typeof row.qr === 'string' && row.qr.startsWith('data:'))) ? (
+                    <a href={row.qrDataUrl || row.qr} target="_blank" rel="noreferrer" title="Open QR">
+                      <img src={row.qrDataUrl || row.qr} alt="QR" className="w-8 h-8 object-contain border rounded" />
+                    </a>
+                  ) : (
+                    <span className="text-gray-400 text-xs">N/A</span>
+                  )}
+                </td>
+                <td className="p-1 border-b">
+                  {(row.pdfBase64 || row.pdfUrl) ? (
+                    <button
+                      type="button"
+                      onClick={() => downloadRowPdf(row)}
+                      className="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      PDF
+                    </button>
+                  ) : (
+                    <span className="text-gray-400 text-xs">N/A</span>
+                  )}
+                </td>
+                <td className="p-1 border-b text-center">
+                  {row.__valid === true ? 'Yes' : row.__valid === false ? 'No' : '-'}
+                </td>
+                <td className="p-1 border-b">
+                  <input type="checkbox" checked={row.__selected !== false} onChange={() => toggleRowFlag(idx, '__selected')} />
+                </td>
+                <td className="p-1 border-b text-[11px] text-red-700">
+                  {Array.isArray(row.__errors) && row.__errors.length ? row.__errors.join(', ') : ''}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex items-center gap-2 mt-3 flex-wrap">
+        <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
+        {!isValidated && (
+          <button onClick={validateRecords} disabled={!rows.length || validating} className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700">
+            {validating ? 'Validating...' : 'Validate Records'}
+          </button>
+        )}
+        {isValidated && showValidatedExport && (
+          <>
+            <button onClick={exportReservedExcel} disabled={!validationSummary?.valid || exporting} className="px-3 py-2 rounded bg-green-600 text-white disabled:opacity-50 hover:bg-green-700">
+              {exporting ? 'Exporting...' : 'Export'}
+            </button>
+          </>
+        )}
+        {isValidated && (
+          <button onClick={submitInvoices} disabled={!validationSummary?.valid || submitting} className="px-3 py-2 rounded bg-amber-500 text-white disabled:opacity-50">
+            {submitting ? 'Submitting...' : 'Submit'}
+          </button>
+        )}
+        {canExport && (
+          <button
+            onClick={exportSubmittedToExcel}
+            className="px-3 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+          >
+            Export Excel
+          </button>
+        )}
+      </div>
+    </div>
+  )}
       {success && (
         <div className="bg-green-50 border border-green-200 text-green-800 rounded p-3 mb-4">
-          {typeof success === 'string' ? success : (() => {
-            try { return JSON.stringify(success); } catch { return String(success); }
-          })()}
+          <div className="font-semibold mb-1">Success</div>
+          <p className="text-sm text-gray-700">{success}</p>
+          {submitSummary && (
+            <p className="text-sm text-gray-700">Succeeded: <strong>{submitSummary.successCount}</strong> / <strong>{submitSummary.total}</strong></p>
+          )}
         </div>
       )}
-
-      {validationSummary && (
-        <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded p-3 mb-4">
-          <div className="font-semibold">Validation Summary</div>
-          <div className="text-sm mt-1">
-            Total: <strong>{validationSummary.total}</strong> Â· Valid: <strong>{validationSummary.valid}</strong> Â· Invalid: <strong>{validationSummary.invalid}</strong>
-          </div>
-        </div>
-      )}
-
-      {submitSummary && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded p-3 mb-4">
-          <div className="font-semibold">Submission Summary</div>
-          <div className="text-sm mt-1">
-            Succeeded: <strong>{submitSummary.successCount}</strong> / <strong>{submitSummary.total}</strong>
-          </div>
-        </div>
-      )}
-
       {serverReport && (
         <div className="bg-white rounded shadow p-4">
           <h4 className="text-md font-semibold mb-2">Server Report</h4>
           <pre className="text-xs bg-gray-50 border rounded p-3 overflow-auto max-h-64">{JSON.stringify(serverReport, null, 2)}</pre>
         </div>
       )}
-
       {/* Submit Results: PDF links, env badge, IRN */}
       {submitResults && submitResults.length > 0 && (
         <div className="bg-white rounded shadow p-4 mt-4">
@@ -1449,14 +1457,13 @@ headerRow.font = { bold: true };
           </div>
         </div>
       )}
-
       {/* Success modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowSuccessModal(false)}></div>
           <div className="relative bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
             <div className="flex items-start gap-3">
-              <div className="text-blue-600 text-2xl">â„¹</div>
+              <div className="text-blue-600 text-2xl">i</div>
               <div>
                 <h5 className="font-semibold mb-1">Success</h5>
                 <p className="text-sm text-gray-700">{successMessage || 'All rows validated and submitted successfully.'}</p>
@@ -1478,4 +1485,5 @@ headerRow.font = { bold: true };
 }
 
 export default UploadInvoices;
+
 
