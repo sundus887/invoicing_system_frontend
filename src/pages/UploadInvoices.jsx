@@ -1,4 +1,4 @@
-// src/pages/UploadInvoices.jsx
+﻿// src/pages/UploadInvoices.jsx
 import React, { useMemo, useRef, useState } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -579,7 +579,7 @@ function UploadInvoices() {
         // ignore JSON parse errors
       }
       if (!probe.ok || !statusJson?.available) {
-        // Backend not ready — gracefully fall back to local generator
+        // Backend not ready â€” gracefully fall back to local generator
         await downloadExcelTemplateLocal();
         setErrors([]);
         setSuccess('Backend template unavailable. A local Excel template with bold headers has been downloaded.');
@@ -949,8 +949,8 @@ function UploadInvoices() {
       setValidatedRows(mergedWithLocal);
 
       // Compute and show summary counts
-      const total = Number(data?.summary?.total ?? (mergedWithLocal || []).length);
-      const validCount = Number(data?.summary?.valid ?? (mergedWithLocal || []).filter(x => x.__valid === true && x.__selected !== false).length);
+      const total = (mergedWithLocal || []).filter(x => x.__selected !== false).length;
+      const validCount = (mergedWithLocal || []).filter(x => x.__valid === true && x.__selected !== false).length;
       const invalidCount = total - validCount;
       setValidationSummary({ total, valid: validCount, invalid: invalidCount });
       // Reveal export when there are validated rows
@@ -1242,8 +1242,8 @@ function UploadInvoices() {
           <div className="font-semibold">Submit to System / FBR</div>
           <p className="text-sm text-gray-600 mt-1">Review the preview, then submit valid rows.</p>
           <ul className="text-xs text-gray-600 mt-2 list-disc ml-4 space-y-1">
-            <li>✅ Valid rows are highlighted</li>
-            <li>❌ Invalid rows show error messages</li>
+            <li>âœ… Valid rows are highlighted</li>
+            <li>âŒ Invalid rows show error messages</li>
             <li>FBR token is handled server-side</li>
           </ul>
         </div>
@@ -1274,7 +1274,7 @@ function UploadInvoices() {
                 aria-label="Close preview"
                 title="Close preview"
               >
-                ×
+                Ã—
               </button>
             </div>
           </div>
@@ -1318,7 +1318,7 @@ function UploadInvoices() {
                           <img src={row.qrDataUrl || row.qr} alt="QR" className="w-8 h-8 object-contain border rounded" />
                         </a>
                       ) : (
-                        <span className="text-gray-400 text-xs">—</span>
+                        <span className="text-gray-400 text-xs">â€”</span>
                       )}
                     </td>
                     <td className="p-1 border-b">
@@ -1331,11 +1331,11 @@ function UploadInvoices() {
                           PDF
                         </button>
                       ) : (
-                        <span className="text-gray-400 text-xs">—</span>
+                        <span className="text-gray-400 text-xs">â€”</span>
                       )}
                     </td>
                     <td className="p-1 border-b text-center">
-                      {row.__valid === true ? '✅' : row.__valid === false ? '❌' : '-'}
+                      {row.__valid === true ? 'âœ…' : row.__valid === false ? 'âŒ' : '-'}
                     </td>
                     <td className="p-1 border-b">
                       <input type="checkbox" checked={row.__selected !== false} onChange={() => toggleRowFlag(idx, '__selected')} />
@@ -1391,7 +1391,7 @@ function UploadInvoices() {
         <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded p-3 mb-4">
           <div className="font-semibold">Validation Summary</div>
           <div className="text-sm mt-1">
-            Total: <strong>{validationSummary.total}</strong> · Valid: <strong>{validationSummary.valid}</strong> · Invalid: <strong>{validationSummary.invalid}</strong>
+            Total: <strong>{validationSummary.total}</strong> Â· Valid: <strong>{validationSummary.valid}</strong> Â· Invalid: <strong>{validationSummary.invalid}</strong>
           </div>
         </div>
       )}
@@ -1448,7 +1448,7 @@ function UploadInvoices() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowSuccessModal(false)}></div>
           <div className="relative bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
             <div className="flex items-start gap-3">
-              <div className="text-blue-600 text-2xl">ℹ</div>
+              <div className="text-blue-600 text-2xl">â„¹</div>
               <div>
                 <h5 className="font-semibold mb-1">Success</h5>
                 <p className="text-sm text-gray-700">{successMessage || 'All rows validated and submitted successfully.'}</p>
@@ -1470,3 +1470,4 @@ function UploadInvoices() {
 }
 
 export default UploadInvoices;
+
