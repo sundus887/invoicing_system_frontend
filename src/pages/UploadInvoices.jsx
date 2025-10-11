@@ -564,6 +564,13 @@ headerRow.font = { bold: true };
       // Set column widths
       sheet.columns = columnsHelp.map(h => ({ width: Math.min(Math.max(h.length + 2, 14), 30) }));
 
+      // Force InvoiceDate column to display as yyyy/mm/dd in Excel UI
+      const dateColIndex = columnsHelp.findIndex(h => h === 'InvoiceDate') + 1; // 1-based index for Excel
+      if (dateColIndex > 0) {
+        const col = sheet.getColumn(dateColIndex);
+        col.numFmt = 'yyyy/mm/dd';
+      }
+
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
@@ -831,6 +838,12 @@ headerRow.font = { bold: true };
   const totalInvoices = useMemo(() => preview.filter(r => r.__valid === true && r.__selected).length, [preview]);
 
   const handleCellEdit = (rowIndex, key, value) => {
+    // Normalize date input for InvoiceDate immediately on edit
+    try {
+      if (normKey(key) === 'invoicedate') {
+        value = normalizeDate(value);
+      }
+    } catch {}
     if (validated.length) {
       setValidated(prev => prev.map((r, i) => (i === rowIndex ? { ...r, [key]: value } : r)));
     } else {
