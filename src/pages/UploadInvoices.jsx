@@ -858,6 +858,8 @@ function UploadInvoices() {
         return { ...r, __errors: localErrs, __valid: localErrs.length === 0, __selected: r.__selected ?? true };
       });
       setValidated(preChecked);
+      // Preserve a stable copy so UI stays populated even if server validation fails
+      setLastGoodRows(preChecked);
       setValidatedRows(preChecked);
       
       // Call the new validate-assign route (returns per-row isValid/errors/assignedInvoiceNo and possibly IRN/QR/PDF)
@@ -957,6 +959,14 @@ function UploadInvoices() {
       let serverMsg = e?.response?.data?.message || e?.response?.data || e?.message || 'Validation failed';
       if (typeof serverMsg !== 'string') {
         try { serverMsg = JSON.stringify(serverMsg); } catch { serverMsg = 'Validation failed'; }
+      }
+      // Do NOT clear preview/grid on errors; ensure some data remains visible
+      if ((!validated || validated.length === 0) && rows && rows.length > 0) {
+        setValidated(rows.map((r) => ({ ...r, __errors: Array.isArray(r.__errors)? r.__errors : [], __valid: r.__valid ?? false, __selected: r.__selected ?? true })));
+      }
+      // Also keep last good rows as a fallback
+      if (Array.isArray(lastGoodRows) && lastGoodRows.length > 0 && preview.length === 0) {
+        setRows(lastGoodRows);
       }
       setErrors([serverMsg]);
     } finally {
