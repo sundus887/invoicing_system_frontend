@@ -97,7 +97,7 @@ function UploadInvoices() {
     const y = date.getFullYear();
     const m = pad2(date.getMonth() + 1);
     const d = pad2(date.getDate());
-    return `${y}/${m}/${d}`; // exact format required
+    return `${y}-${m}-${d}`; // exact format required (yyyy-mm-dd)
   }
   function excelSerialToDate(n) {
     // Excel's serial date epoch: 1899-12-30
@@ -124,7 +124,7 @@ function UploadInvoices() {
       const mo = Number(m[2]);
       const d = Number(m[3]);
       if (y > 1900 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
-        return `${y}/${pad2(mo)}/${pad2(d)}`;
+        return `${y}-${pad2(mo)}-${pad2(d)}`;
       }
     }
     // dd/mm/yyyy or mm/dd/yyyy (ambiguous) -> prefer dd/mm/yyyy only if first part > 12
@@ -137,16 +137,26 @@ function UploadInvoices() {
       if (a > 12) {
         // interpret as dd/mm/yyyy
         const d = a; const mo = b;
-        return `${y}/${pad2(mo)}/${pad2(d)}`;
+        return `${y}-${pad2(mo)}-${pad2(d)}`;
       }
       // otherwise assume mm/dd/yyyy as coming from Excel UI
       const mo = a; const d = b;
-      return `${y}/${pad2(mo)}/${pad2(d)}`;
+      return `${y}-${pad2(mo)}-${pad2(d)}`;
     }
     // Fallback: Date.parse
     const parsed = new Date(s);
     if (!isNaN(parsed)) return toYMD(parsed);
     return s; // leave as-is if unknown
+  }
+
+  // --- HS Code normalization (force 8 digits with dot: dddd.dddd) ---
+  function normalizeHsCode(val) {
+    if (val == null) return '';
+    let s = String(val).trim();
+    if (!s) return '';
+    const digits = s.replace(/[^0-9]/g, '');
+    const eight = (digits.length >= 8 ? digits.slice(0, 8) : digits.padEnd(8, '0'));
+    return `${eight.slice(0,4)}.${eight.slice(4,8)}`;
   }
 
   // --- Download helpers & polling ---
@@ -564,11 +574,18 @@ headerRow.font = { bold: true };
       // Set column widths
       sheet.columns = columnsHelp.map(h => ({ width: Math.min(Math.max(h.length + 2, 14), 30) }));
 
-      // Force InvoiceDate column to display as yyyy/mm/dd in Excel UI
+      // Force InvoiceDate column to display as yyyy-mm-dd in Excel UI
       const dateColIndex = columnsHelp.findIndex(h => h === 'InvoiceDate') + 1; // 1-based index for Excel
       if (dateColIndex > 0) {
         const col = sheet.getColumn(dateColIndex);
-        col.numFmt = 'yyyy/mm/dd';
+        col.numFmt = 'yyyy-mm-dd';
+      }
+
+      // Force HsCode column to Text so trailing zeros are preserved
+      const hsColIndex = columnsHelp.findIndex(h => h === 'HsCode') + 1;
+      if (hsColIndex > 0) {
+        const col = sheet.getColumn(hsColIndex);
+        col.numFmt = '@'; // treat as text
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
@@ -730,7 +747,7 @@ headerRow.font = { bold: true };
       try {
         // Primary: read with first row as headers
         // Force consistent date formatting from Excel cells
-        const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, cellDates: true, dateNF: 'yyyy/mm/dd' });
+        const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, cellDates: true, dateNF: 'yyyy-mm-dd' });
         // Build tolerant header map (case/space/punctuation-insensitive)
         const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const firstRowKeys = (json[0] && typeof json[0] === 'object') ? Object.keys(json[0]) : [];
@@ -749,6 +766,7 @@ headerRow.font = { bold: true };
             const srcKey = keyMap.get(norm(h));
             let v = srcKey ? (r[srcKey] ?? '') : '';
             if (norm(h) === 'invoicedate') v = normalizeDate(v);
+            if (norm(h) === 'hscode') v = normalizeHsCode(v);
             obj[h] = v;
           });
 
@@ -768,7 +786,7 @@ headerRow.font = { bold: true };
         });
       } catch (primaryErr) {
         // Fallback: tolerant header mapping using header:1 (rows as arrays)
-        const rows2D = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, blankrows: false, cellDates: true, dateNF: 'yyyy/mm/dd' });
+        const rows2D = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, blankrows: false, cellDates: true, dateNF: 'yyyy-mm-dd' });
         if (!Array.isArray(rows2D) || rows2D.length < 2) throw primaryErr;
         const headerRow = rows2D[0].map(v => String(v || '').trim());
         const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
