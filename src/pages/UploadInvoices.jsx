@@ -47,6 +47,8 @@ function UploadInvoices() {
   const [file, setFile] = useState(null);
   // Local rows parsed from Excel (editable)
   const [rows, setRows] = useState([]);
+  // Keep last successful, non-empty parse so UI can recover after errors
+  const [lastGoodRows, setLastGoodRows] = useState([]);
   // Alias states to match requested core flow names
   const [parsedRows, setParsedRows] = useState([]);
   const [validatedRows, setValidatedRows] = useState([]);
@@ -708,7 +710,14 @@ function UploadInvoices() {
           return obj;
         });
       }
+      // If nothing parsed, keep previous data and show helpful error
+      if (!Array.isArray(out) || out.length === 0) {
+        setErrors(['No rows found. Please ensure you are using the provided Excel template with correct headers.']);
+        // Do not clear existing rows/preview
+        return;
+      }
       setRows(out);
+      setLastGoodRows(out);
       setParsedRows(out);
       setValidatedRows([]);
       setAllValid(false);
@@ -716,6 +725,10 @@ function UploadInvoices() {
     } catch (err) {
       console.error('Local parse error', err);
       setErrors(['Failed to parse Excel. Make sure it uses the provided template headers.']);
+      // Restore last good rows if available
+      if (Array.isArray(lastGoodRows) && lastGoodRows.length > 0) {
+        setRows(lastGoodRows);
+      }
     } finally {
       setUploading(false);
     }
@@ -761,6 +774,7 @@ function UploadInvoices() {
     const saleType = row.saleType ?? row.saleType;
     const fedPayable = row.fedPayable ?? row.fedPayable;
     // Basic rules (extend as needed)
+    const required = (v) => v !== undefined && v !== null && String(v).trim() !== '';
     if (!invoiceNo) errs.push('Invoice number missing');
     if (!saleType) errs.push('Sale type required');
     if (fedPayable !== undefined && fedPayable !== '' && isNaN(Number(fedPayable))) errs.push('FED payable must be number');
@@ -770,9 +784,13 @@ function UploadInvoices() {
     const customerName = row.customerName ?? row.BuyerBusinessName;
     const customerNTN = row.customerNTN ?? row.BuyerNTNCNIC;
     const customerCNIC = row.customerCNIC ?? null;
-    if (!invoiceDate) errs.push('Invoice date missing');
-    if (!customerName) errs.push('Customer name required');
-    if (!customerNTN && !customerCNIC) errs.push('Either NTN or CNIC required');
+    if (!required(invoiceDate)) {
+      errs.push('Invoice date missing');
+    } else if (isNaN(Date.parse(invoiceDate))) {
+      errs.push('Invoice date is invalid');
+    }
+    if (!required(customerName)) errs.push('Buyer name required');
+    if (!required(customerNTN) && !required(customerCNIC)) errs.push('Either NTN or CNIC required');
 
     const quantity = row.quantity;
     const unitPrice = row.unitPrice ?? row.Rate;
@@ -782,6 +800,7 @@ function UploadInvoices() {
     const totalValue = row.totalValue ?? row.totalValues;
     const totalTax = row.totalTax ?? null;
     const grossTotal = row.grossTotal ?? null;
+    const productDesc = row.ProductDescription ?? row.product ?? row.description;
 
     const mustNumber = [
       ['Quantity', quantity],
@@ -798,6 +817,29 @@ function UploadInvoices() {
         errs.push(`${label} must be number`);
       }
     });
+
+    // Required presence for core invoice line
+    if (!required(productDesc)) errs.push('Product/Service description required');
+    if (!required(quantity)) errs.push('Quantity required');
+    if (required(quantity) && Number(quantity) <= 0) errs.push('Quantity must be > 0');
+    if (!required(unitPrice)) errs.push('Unit price required');
+    if (required(unitPrice) && Number(unitPrice) <= 0) errs.push('Unit price must be > 0');
+
+    // Detect totally empty row (user left row blank)
+    try {
+      const isEmptyRow = (Array.isArray(Object.keys(row)) ? Object.keys(row) : []).every((k) => {
+        if (k.startsWith('__')) return true; // ignore helper flags
+        const v = row[k];
+        return v === '' || v === null || v === undefined;
+      });
+      if (isEmptyRow) errs.push('Empty row');
+    } catch {}
+
+    // Detect template/header mismatch: if very few key fields have any value
+    const keyPresence = [invoiceNo, customerName, productDesc, invoiceDate].filter(required).length;
+    if (keyPresence < 2) {
+      errs.push('Invalid template or headers. Please use the provided Excel template.');
+    }
 
     return errs;
   }
