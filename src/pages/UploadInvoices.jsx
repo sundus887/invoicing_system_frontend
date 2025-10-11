@@ -578,14 +578,15 @@ headerRow.font = { bold: true };
       const dateColIndex = columnsHelp.findIndex(h => h === 'InvoiceDate') + 1; // 1-based index for Excel
       if (dateColIndex > 0) {
         const col = sheet.getColumn(dateColIndex);
-        col.numFmt = 'yyyy-mm-dd';
+        // Quote the hyphens so Excel does NOT replace with regional date separator
+        col.numFmt = 'yyyy"-"mm"-"dd';
       }
 
-      // Force HsCode column to Text so trailing zeros are preserved
+      // Force HsCode column to display as dddd.dddd with trailing zeros (works even for numeric input)
       const hsColIndex = columnsHelp.findIndex(h => h === 'HsCode') + 1;
       if (hsColIndex > 0) {
         const col = sheet.getColumn(hsColIndex);
-        col.numFmt = '@'; // treat as text
+        col.numFmt = '0000"."0000';
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
@@ -860,6 +861,9 @@ headerRow.font = { bold: true };
     try {
       if (normKey(key) === 'invoicedate') {
         value = normalizeDate(value);
+      }
+      if (normKey(key) === 'hscode') {
+        value = normalizeHsCode(value);
       }
     } catch {}
     if (validated.length) {
