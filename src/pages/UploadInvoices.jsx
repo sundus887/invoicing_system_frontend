@@ -913,13 +913,30 @@ headerRow.font = { bold: true };
     const customerName = row.customerName ?? row.BuyerBusinessName;
     const customerNTN = row.customerNTN ?? row.BuyerNTNCNIC;
     const customerCNIC = row.customerCNIC ?? null;
+    const buyerRegRaw = row.BuyerRegistrationType ?? row.buyerRegistrationType ?? '';
+    const buyerReg = String(buyerRegRaw || '').trim().toLowerCase();
+    const isUnregistered = buyerReg.startsWith('unreg');
     if (!required(invoiceDate)) {
       errs.push('Invoice date missing');
     } else if (isNaN(Date.parse(invoiceDate))) {
       errs.push('Invoice date is invalid');
     }
     if (!required(customerName)) errs.push('Buyer name required');
-    if (!required(customerNTN) && !required(customerCNIC)) errs.push('Either NTN or CNIC required');
+    // Registration-based NTN/CNIC checks
+    if (isUnregistered) {
+      // For unregistered buyers: allow empty or exactly '1234567'
+      const v = String(customerNTN || '').trim();
+      if (v && v !== '1234567') {
+        errs.push('For unregistered buyer, BuyerNTNCNIC must be 1234567 or left empty');
+      }
+    } else {
+      // Registered buyers must provide a real NTN/CNIC and not the placeholder
+      if (!required(customerNTN)) {
+        errs.push('BuyerNTNCNIC required for registered buyer');
+      } else if (String(customerNTN).trim() === '1234567') {
+        errs.push('BuyerNTNCNIC cannot be 1234567 for registered buyer');
+      }
+    }
 
     const quantity = row.quantity;
     const unitPrice = row.unitPrice ?? row.Rate;
