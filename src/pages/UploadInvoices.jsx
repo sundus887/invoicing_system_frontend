@@ -582,11 +582,18 @@ headerRow.font = { bold: true };
         col.numFmt = 'dd"-"mm"-"yyyy';
       }
 
-      // Force HsCode column to display as dddd.dddd with trailing zeros (works even for numeric input)
+      // Keep HsCode as Text so Excel does not reformat user input
       const hsColIndex = columnsHelp.findIndex(h => h === 'HsCode') + 1;
       if (hsColIndex > 0) {
         const col = sheet.getColumn(hsColIndex);
-        col.numFmt = '0000"."0000';
+        col.numFmt = '@';
+      }
+
+      // Keep BuyerNTNCNIC as Text so Excel does not strip leading zeros or reformat
+      const buyerIdColIndex = columnsHelp.findIndex(h => h === 'BuyerNTNCNIC') + 1;
+      if (buyerIdColIndex > 0) {
+        const col = sheet.getColumn(buyerIdColIndex);
+        col.numFmt = '@';
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
@@ -767,7 +774,6 @@ headerRow.font = { bold: true };
             const srcKey = keyMap.get(norm(h));
             let v = srcKey ? (r[srcKey] ?? '') : '';
             if (norm(h) === 'invoicedate') v = normalizeDate(v);
-            if (norm(h) === 'hscode') v = normalizeHsCode(v);
             obj[h] = v;
           });
 
@@ -922,19 +928,21 @@ headerRow.font = { bold: true };
       errs.push('Invoice date is invalid');
     }
     if (!required(customerName)) errs.push('Buyer name required');
-    // Registration-based NTN/CNIC checks
+    // Registration-based NTN/CNIC checks (BuyerNTNCNIC column holds the ID)
+    const idVal = String(customerNTN || '').trim();
+    const cnicRegex = /^(?:\d{13}|\d{5}-\d{7}-\d)$/; // 13 digits or 5-7-1 format
+    const ntnRegex = /^(?:\d{7,9}|\d{7}-\d)$/; // tolerant NTN: 7-9 digits or 7 digits + check digit
     if (isUnregistered) {
-      // For unregistered buyers: allow empty or exactly '1234567'
-      const v = String(customerNTN || '').trim();
-      if (v && v !== '1234567') {
-        errs.push('For unregistered buyer, BuyerNTNCNIC must be 1234567 or left empty');
+      if (!idVal) {
+        errs.push('For unregistered buyer, CNIC is required in BuyerNTNCNIC (e.g., 12345-1234567-1)');
+      } else if (!cnicRegex.test(idVal)) {
+        errs.push('Invalid CNIC format for unregistered buyer (use 13 digits or 12345-1234567-1)');
       }
     } else {
-      // Registered buyers must provide a real NTN/CNIC and not the placeholder
-      if (!required(customerNTN)) {
-        errs.push('BuyerNTNCNIC required for registered buyer');
-      } else if (String(customerNTN).trim() === '1234567') {
-        errs.push('BuyerNTNCNIC cannot be 1234567 for registered buyer');
+      if (!idVal) {
+        errs.push('For registered buyer, NTN is required in BuyerNTNCNIC');
+      } else if (!ntnRegex.test(idVal)) {
+        errs.push('Invalid NTN format for registered buyer');
       }
     }
 
@@ -1008,25 +1016,31 @@ headerRow.font = { bold: true };
       setLastGoodRows(preChecked);
       setValidatedRows(preChecked);
       
+      // Prepare server-safe copy (normalize only what backend needs, keep UI unchanged)
+      const rowsForServer = rows.map(r => ({
+        ...r,
+        HsCode: normalizeHsCode(r.HsCode)
+      }));
+
       // Call the new validate-assign route (returns per-row isValid/errors/assignedInvoiceNo and possibly IRN/QR/PDF)
       let data = null;
       try {
         if (!sellerId) throw new Error('Missing seller/company id');
         const res = await api.post(
           `/api/invoices/validate-assign`,
-          { rows, sellerId },
+          { rows: rowsForServer, sellerId },
           { headers: { 'x-seller-id': sellerId }, withCredentials: true }
         );
         data = res.data || {};
       } catch (err1) {
         // Fallback chain: legacy simple validate, then company-scoped
         try {
-          const resSimple = await api.post('/api/validate', { rows }, { withCredentials: true });
+          const resSimple = await api.post('/api/validate', { rows: rowsForServer }, { withCredentials: true });
           data = resSimple.data || {};
         } catch (err2) {
           if (!sellerId) throw err2;
           const companyId = encodeURIComponent(sellerId);
-          const res2 = await api.post(`/api/invoice/validate/${companyId}`, { rows }, { withCredentials: true });
+          const res2 = await api.post(`/api/invoice/validate/${companyId}`, { rows: rowsForServer }, { withCredentials: true });
           data = res2.data || {};
         }
       }
