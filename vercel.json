@@ -5,7 +5,7 @@
   "installCommand": "npm install",
   "devCommand": "npm start",
   "rewrites": [
-    { "source": "/api/proxy/:path*", "destination": "/api/proxy/:path*" },
+    { "source": "/api/proxy/:path*", "destination": "https://hsoftworks.vercel.app/:path*" },
     { "source": "/api/:path*", "destination": "https://hsoftworks.vercel.app/api/:path*" }
   ]
 }
