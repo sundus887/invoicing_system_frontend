@@ -3,23 +3,53 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ProtectedRoute, { AdminRoute, SellerRoute } from '../components/ProtectedRoute';
 
-// Lazy-load page components for route-level code splitting
-const Layout = lazy(() => import(/* webpackChunkName: "layout" */ '../components/Layout').then(m => ({ default: m.default || m })));
-const Login = lazy(() => import(/* webpackChunkName: "page-login" */ '../pages/Login').then(m => ({ default: m.default || m })));
-const Dashboard = lazy(() => import(/* webpackChunkName: "page-dashboard" */ '../pages/Dashboard').then(m => ({ default: m.default || m })));
-const Services = lazy(() => import(/* webpackChunkName: "page-services" */ '../pages/Services').then(m => ({ default: m.default || m })));
-const Invoices = lazy(() => import(/* webpackChunkName: "page-invoices" */ '../pages/Invoices').then(m => ({ default: m.default || m })));
-const Clients = lazy(() => import(/* webpackChunkName: "page-clients" */ '../pages/Clients').then(m => ({ default: m.default || m })));
-const TasksPage = lazy(() => import(/* webpackChunkName: "page-tasks" */ '../pages/TasksPage').then(m => ({ default: m.default || m })));
-const ExportPage = lazy(() => import(/* webpackChunkName: "page-export" */ '../pages/ExportPage').then(m => ({ default: m.default || m })));
-const FbrEInvoicing = lazy(() => import(/* webpackChunkName: "page-fbr-e-invoicing" */ '../pages/FbrEInvoicing').then(m => ({ default: m.default || m })));
-const Settings = lazy(() => import(/* webpackChunkName: "page-settings" */ '../pages/Settings').then(m => ({ default: m.default || m })));
-const UploadInvoices = lazy(() => import(/* webpackChunkName: "page-upload" */ '../pages/UploadInvoices').then(m => ({ default: m.default || m })));
-const InvoiceHistory = lazy(() => import(/* webpackChunkName: "page-history" */ '../pages/InvoiceHistory').then(m => ({ default: m.default || m })));
-const SellerForm = lazy(() => import(/* webpackChunkName: "page-seller-form" */ '../pages/SellerForm').then(m => ({ default: m.default || m })));
-const InvoiceUploadDirect = lazy(() => import(/* webpackChunkName: "page-upload-direct" */ '../pages/InvoiceUploadDirect').then(m => ({ default: m.default || m })));
-const UserRoles = lazy(() => import(/* webpackChunkName: "page-user-roles" */ '../pages/UserRoles').then(m => ({ default: m.default || m })));
-const SellerConfigurationPage = lazy(() => import(/* webpackChunkName: "page-seller-config" */ '../pages/SellerConfigurationPage').then(m => ({ default: m.default || m })));
+// Debug toggle: set true to eagerly import routes and surface module errors directly
+const EAGER_ROUTES = true;
+
+// Helper: wrap dynamic imports to log and normalize default export
+const lazyLog = (loader, name) => lazy(() => loader()
+  .then((m) => ({ default: m?.default ?? m }))
+  .catch((e) => { console.error(`Failed to load chunk for ${name}:`, e); throw e; })
+);
+
+// Choose between eager imports (for debugging) and lazy imports (for code-splitting)
+let Layout, Login, Dashboard, Services, Invoices, Clients, TasksPage, ExportPage, FbrEInvoicing, Settings, UploadInvoices, InvoiceHistory, SellerForm, InvoiceUploadDirect, UserRoles, SellerConfigurationPage;
+
+if (EAGER_ROUTES) {
+  try { Layout = require('../components/Layout').default || require('../components/Layout'); } catch (e) { console.error('Eager load failed: Layout', e); }
+  try { Login = require('../pages/Login').default || require('../pages/Login'); } catch (e) { console.error('Eager load failed: Login', e); }
+  try { Dashboard = require('../pages/Dashboard').default || require('../pages/Dashboard'); } catch (e) { console.error('Eager load failed: Dashboard', e); }
+  try { Services = require('../pages/Services').default || require('../pages/Services'); } catch (e) { console.error('Eager load failed: Services', e); }
+  try { Invoices = require('../pages/Invoices').default || require('../pages/Invoices'); } catch (e) { console.error('Eager load failed: Invoices', e); }
+  try { Clients = require('../pages/Clients').default || require('../pages/Clients'); } catch (e) { console.error('Eager load failed: Clients', e); }
+  try { TasksPage = require('../pages/TasksPage').default || require('../pages/TasksPage'); } catch (e) { console.error('Eager load failed: TasksPage', e); }
+  try { ExportPage = require('../pages/ExportPage').default || require('../pages/ExportPage'); } catch (e) { console.error('Eager load failed: ExportPage', e); }
+  try { FbrEInvoicing = require('../pages/FbrEInvoicing').default || require('../pages/FbrEInvoicing'); } catch (e) { console.error('Eager load failed: FbrEInvoicing', e); }
+  try { Settings = require('../pages/Settings').default || require('../pages/Settings'); } catch (e) { console.error('Eager load failed: Settings', e); }
+  try { UploadInvoices = require('../pages/UploadInvoices').default || require('../pages/UploadInvoices'); } catch (e) { console.error('Eager load failed: UploadInvoices', e); }
+  try { InvoiceHistory = require('../pages/InvoiceHistory').default || require('../pages/InvoiceHistory'); } catch (e) { console.error('Eager load failed: InvoiceHistory', e); }
+  try { SellerForm = require('../pages/SellerForm').default || require('../pages/SellerForm'); } catch (e) { console.error('Eager load failed: SellerForm', e); }
+  try { InvoiceUploadDirect = require('../pages/InvoiceUploadDirect').default || require('../pages/InvoiceUploadDirect'); } catch (e) { console.error('Eager load failed: InvoiceUploadDirect', e); }
+  try { UserRoles = require('../pages/UserRoles').default || require('../pages/UserRoles'); } catch (e) { console.error('Eager load failed: UserRoles', e); }
+  try { SellerConfigurationPage = require('../pages/SellerConfigurationPage').default || require('../pages/SellerConfigurationPage'); } catch (e) { console.error('Eager load failed: SellerConfigurationPage', e); }
+} else {
+  Layout = lazyLog(() => import(/* webpackChunkName: "layout" */ '../components/Layout'), 'Layout');
+  Login = lazyLog(() => import(/* webpackChunkName: "page-login" */ '../pages/Login'), 'Login');
+  Dashboard = lazyLog(() => import(/* webpackChunkName: "page-dashboard" */ '../pages/Dashboard'), 'Dashboard');
+  Services = lazyLog(() => import(/* webpackChunkName: "page-services" */ '../pages/Services'), 'Services');
+  Invoices = lazyLog(() => import(/* webpackChunkName: "page-invoices" */ '../pages/Invoices'), 'Invoices');
+  Clients = lazyLog(() => import(/* webpackChunkName: "page-clients" */ '../pages/Clients'), 'Clients');
+  TasksPage = lazyLog(() => import(/* webpackChunkName: "page-tasks" */ '../pages/TasksPage'), 'TasksPage');
+  ExportPage = lazyLog(() => import(/* webpackChunkName: "page-export" */ '../pages/ExportPage'), 'ExportPage');
+  FbrEInvoicing = lazyLog(() => import(/* webpackChunkName: "page-fbr-e-invoicing" */ '../pages/FbrEInvoicing'), 'FbrEInvoicing');
+  Settings = lazyLog(() => import(/* webpackChunkName: "page-settings" */ '../pages/Settings'), 'Settings');
+  UploadInvoices = lazyLog(() => import(/* webpackChunkName: "page-upload" */ '../pages/UploadInvoices'), 'UploadInvoices');
+  InvoiceHistory = lazyLog(() => import(/* webpackChunkName: "page-history" */ '../pages/InvoiceHistory'), 'InvoiceHistory');
+  SellerForm = lazyLog(() => import(/* webpackChunkName: "page-seller-form" */ '../pages/SellerForm'), 'SellerForm');
+  InvoiceUploadDirect = lazyLog(() => import(/* webpackChunkName: "page-upload-direct" */ '../pages/InvoiceUploadDirect'), 'InvoiceUploadDirect');
+  UserRoles = lazyLog(() => import(/* webpackChunkName: "page-user-roles" */ '../pages/UserRoles'), 'UserRoles');
+  SellerConfigurationPage = lazyLog(() => import(/* webpackChunkName: "page-seller-config" */ '../pages/SellerConfigurationPage'), 'SellerConfigurationPage');
+}
 
 const AppRoutes = () => {
   const { loading } = useAuth();

@@ -2,6 +2,7 @@
   "name": "invo-sync",
   "version": "0.1.0",
   "private": true,
+  "homepage": ".",
   "dependencies": {
     "@babel/runtime": "^7.22.0",
     "@testing-library/jest-dom": "^5.16.4",
