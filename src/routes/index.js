@@ -4,22 +4,22 @@ import { useAuth } from '../contexts/AuthContext';
 import ProtectedRoute, { AdminRoute, SellerRoute } from '../components/ProtectedRoute';
 
 // Lazy-load page components for route-level code splitting
-const Layout = lazy(() => import(/* webpackChunkName: "layout" */ '../components/Layout'));
-const Login = lazy(() => import(/* webpackChunkName: "page-login" */ '../pages/Login'));
-const Dashboard = lazy(() => import(/* webpackChunkName: "page-dashboard" */ '../pages/Dashboard'));
-const Services = lazy(() => import(/* webpackChunkName: "page-services" */ '../pages/Services'));
-const Invoices = lazy(() => import(/* webpackChunkName: "page-invoices" */ '../pages/Invoices'));
-const Clients = lazy(() => import(/* webpackChunkName: "page-clients" */ '../pages/Clients'));
-const TasksPage = lazy(() => import(/* webpackChunkName: "page-tasks" */ '../pages/TasksPage'));
-const ExportPage = lazy(() => import(/* webpackChunkName: "page-export" */ '../pages/ExportPage'));
-const FbrEInvoicing = lazy(() => import(/* webpackChunkName: "page-fbr-e-invoicing" */ '../pages/FbrEInvoicing'));
-const Settings = lazy(() => import(/* webpackChunkName: "page-settings" */ '../pages/Settings'));
-const UploadInvoices = lazy(() => import(/* webpackChunkName: "page-upload" */ '../pages/UploadInvoices'));
-const InvoiceHistory = lazy(() => import(/* webpackChunkName: "page-history" */ '../pages/InvoiceHistory'));
-const SellerForm = lazy(() => import(/* webpackChunkName: "page-seller-form" */ '../pages/SellerForm'));
-const InvoiceUploadDirect = lazy(() => import(/* webpackChunkName: "page-upload-direct" */ '../pages/InvoiceUploadDirect'));
-const UserRoles = lazy(() => import(/* webpackChunkName: "page-user-roles" */ '../pages/UserRoles'));
-const SellerConfigurationPage = lazy(() => import(/* webpackChunkName: "page-seller-config" */ '../pages/SellerConfigurationPage'));
+const Layout = lazy(() => import(/* webpackChunkName: "layout" */ '../components/Layout').then(m => ({ default: m.default || m })));
+const Login = lazy(() => import(/* webpackChunkName: "page-login" */ '../pages/Login').then(m => ({ default: m.default || m })));
+const Dashboard = lazy(() => import(/* webpackChunkName: "page-dashboard" */ '../pages/Dashboard').then(m => ({ default: m.default || m })));
+const Services = lazy(() => import(/* webpackChunkName: "page-services" */ '../pages/Services').then(m => ({ default: m.default || m })));
+const Invoices = lazy(() => import(/* webpackChunkName: "page-invoices" */ '../pages/Invoices').then(m => ({ default: m.default || m })));
+const Clients = lazy(() => import(/* webpackChunkName: "page-clients" */ '../pages/Clients').then(m => ({ default: m.default || m })));
+const TasksPage = lazy(() => import(/* webpackChunkName: "page-tasks" */ '../pages/TasksPage').then(m => ({ default: m.default || m })));
+const ExportPage = lazy(() => import(/* webpackChunkName: "page-export" */ '../pages/ExportPage').then(m => ({ default: m.default || m })));
+const FbrEInvoicing = lazy(() => import(/* webpackChunkName: "page-fbr-e-invoicing" */ '../pages/FbrEInvoicing').then(m => ({ default: m.default || m })));
+const Settings = lazy(() => import(/* webpackChunkName: "page-settings" */ '../pages/Settings').then(m => ({ default: m.default || m })));
+const UploadInvoices = lazy(() => import(/* webpackChunkName: "page-upload" */ '../pages/UploadInvoices').then(m => ({ default: m.default || m })));
+const InvoiceHistory = lazy(() => import(/* webpackChunkName: "page-history" */ '../pages/InvoiceHistory').then(m => ({ default: m.default || m })));
+const SellerForm = lazy(() => import(/* webpackChunkName: "page-seller-form" */ '../pages/SellerForm').then(m => ({ default: m.default || m })));
+const InvoiceUploadDirect = lazy(() => import(/* webpackChunkName: "page-upload-direct" */ '../pages/InvoiceUploadDirect').then(m => ({ default: m.default || m })));
+const UserRoles = lazy(() => import(/* webpackChunkName: "page-user-roles" */ '../pages/UserRoles').then(m => ({ default: m.default || m })));
+const SellerConfigurationPage = lazy(() => import(/* webpackChunkName: "page-seller-config" */ '../pages/SellerConfigurationPage').then(m => ({ default: m.default || m })));
 
 const AppRoutes = () => {
   const { loading } = useAuth();

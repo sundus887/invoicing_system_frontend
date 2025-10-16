@@ -28,6 +28,7 @@
     "eject": "react-scripts eject",
     "backend": "node simple-backend.js"
   },
+  "proxy": "https://hsoftworks.vercel.app",
   "eslintConfig": {
     "extends": [
       "react-app",

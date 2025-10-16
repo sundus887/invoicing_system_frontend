@@ -13,8 +13,8 @@ try {
   if (explicit !== undefined) {
     inferredUseProxy = String(explicit).toLowerCase() === 'true';
   } else if (typeof window !== 'undefined') {
-    // In browser: proxy unless on localhost (CRA dev)
-    inferredUseProxy = window.location.hostname !== 'localhost';
+    // In browser: use proxy on localhost so CRA dev server forwards API
+    inferredUseProxy = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   } else {
     // On server/build: proxy in production
     inferredUseProxy = process.env.NODE_ENV === 'production';
@@ -22,8 +22,10 @@ try {
 } catch (_) {}
 const useProxy = inferredUseProxy;
 // If proxying, we use same-origin serverless route. Otherwise, prefer env/url from API_BASE
+// If using a dev proxy (CRA), leave baseURL empty so calls like '/api/...'
+// go to the dev server and are forwarded to the backend.
 const API_URL = useProxy
-  ? '/api/proxy'
+  ? ''
   : (envApiUrl && envApiUrl.trim().length > 0 ? envApiUrl.trim() : API_BASE).replace(/\/$/, '');
 
 if (process.env.NODE_ENV !== 'production') {
