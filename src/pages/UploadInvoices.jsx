@@ -562,7 +562,8 @@ function UploadInvoices() {
   // Helper: generate a real .xlsx Excel file with BOLD header row using ExcelJS
   const downloadExcelTemplateLocal = async () => {
     try {
-      const ExcelJS = (await import('exceljs')).default || (await import('exceljs'));
+      const mod = await import('exceljs/dist/exceljs.min.js');
+      const ExcelJS = mod?.default ?? mod;
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('Template');
 
